@@ -1,0 +1,11 @@
+{
+    "admin": {
+        "username": "admin",
+        "full_name": "System Administrator",
+        "email": "admin@example.com",
+        "hashed_password": "$2b$12$jUYsrTnYAa4QrIPCabUTMe1EvNaA28d9dAmAGvz5I0Zv1vGcsjAeC",
+        "role": "director",
+        "branch_id": null,
+        "disabled": false
+    }
+}

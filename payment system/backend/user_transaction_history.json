@@ -1,0 +1,30 @@
+{
+    "0124654654": {
+        "user_id": "0124654654",
+        "transaction_ids": [
+            "cf69baa3-2d20-469a-b318-e0c8a85448b3"
+        ],
+        "last_transaction_date": "2025-03-25"
+    },
+    "0465654654": {
+        "user_id": "0465654654",
+        "transaction_ids": [
+            "cf69baa3-2d20-469a-b318-e0c8a85448b3"
+        ],
+        "last_transaction_date": "2025-03-25"
+    },
+    "6504654654": {
+        "user_id": "6504654654",
+        "transaction_ids": [
+            "57652c61-8dc7-42d6-8348-ac32c270c211"
+        ],
+        "last_transaction_date": "2025-03-25"
+    },
+    "0654651656": {
+        "user_id": "0654651656",
+        "transaction_ids": [
+            "57652c61-8dc7-42d6-8348-ac32c270c211"
+        ],
+        "last_transaction_date": "2025-03-25"
+    }
+}

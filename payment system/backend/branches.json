@@ -1,0 +1,23 @@
+{
+    "1": {
+        "id": "1",
+        "name": "Main Branch",
+        "location": "Damascus",
+        "manager_id": "admin",
+        "active": true
+    },
+    "1fbd8e6d-ecbb-4b2e-9040-3cce2a419b67": {
+        "id": "1fbd8e6d-ecbb-4b2e-9040-3cce2a419b67",
+        "name": "\u0627\u0644\u0632\u0631\u0627\u0639\u0629",
+        "location": "\u0641\u0637\u0627\u064a\u0631 \u0627\u0644\u0627\u0645\u064a\u0631",
+        "manager_id": null,
+        "active": true
+    },
+    "9706aad7-8ee5-4d24-a3ae-2c8f3e737c22": {
+        "id": "9706aad7-8ee5-4d24-a3ae-2c8f3e737c22",
+        "name": "\u0627\u0644\u0633\u0627\u0628\u0639",
+        "location": "\u0641\u0631\u0648\u062c \u062d\u0627\u0631\u062a\u0646\u0627",
+        "manager_id": null,
+        "active": true
+    }
+}
