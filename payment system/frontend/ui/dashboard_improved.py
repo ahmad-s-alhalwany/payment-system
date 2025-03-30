@@ -84,7 +84,7 @@ class ModernButton(QPushButton):
         """)
         
         # Add animation on hover
-        self.animation = QPropertyAnimation(self, b"geometry"))
+        self.animation = QPropertyAnimation(self, b"geometry")
         self.animation.setDuration(100)
     
     def lighten_color(self, color):
@@ -220,6 +220,9 @@ class DirectorDashboard(QMainWindow):
         self.setup_quick_actions()
         self.enhance_tables()
         self.setup_signals()
+        
+    def setup_signals(self):
+        self.branches_table.itemSelectionChanged.connect(self.update_branch_actions)    
         
     def setup_quick_actions(self):
         """Add a quick actions panel similar to old version's grouped buttons"""
@@ -491,7 +494,7 @@ class DirectorDashboard(QMainWindow):
             except:
                 pass
             
-            self.branches_table.setItem(row_idx, 4, QTableWidgetItem(str(emp_count))))
+            self.branches_table.setItem(row_idx, 4, QTableWidgetItem(str(emp_count)))
     
     def refresh_all(self):
         """Refresh all data like in old version"""
