@@ -1,4 +1,6 @@
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
+from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt
 import requests
 
 class ChangePasswordDialog(QDialog):
@@ -6,63 +8,77 @@ class ChangePasswordDialog(QDialog):
         super().__init__()
         self.token = token
         self.setWindowTitle("تغيير كلمة المرور")
-        self.setGeometry(250, 250, 400, 200)
+        self.setFixedSize(400, 250)  # Fixed size for consistency
+        
+        # Modernized styling with better spacing
         self.setStyleSheet("""
-            QWidget {
-                background-color: #f5f5f5;
-                font-family: Arial;
+            QDialog {
+                background-color: #f8f9fa;
+                font-family: 'Segoe UI', Arial;
             }
             QLabel {
-                color: #333;
+                color: #495057;
                 font-size: 14px;
-            }
-            QPushButton {
-                background-color: #2c3e50;
-                color: white;
-                border-radius: 5px;
-                padding: 8px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #34495e;
+                margin-bottom: 5px;
             }
             QLineEdit {
-                border: 1px solid #ccc;
-                border-radius: 5px;
-                padding: 8px;
+                border: 1px solid #ced4da;
+                border-radius: 6px;
+                padding: 10px;
                 background-color: white;
                 font-size: 14px;
+                margin-bottom: 15px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #80bdff;
+                box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
             }
         """)
 
         layout = QVBoxLayout()
+        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setSpacing(10)
 
+        # Title
+        title = QLabel("تغيير كلمة المرور")
+        title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("color: #2c3e50; margin-bottom: 20px;")
+        layout.addWidget(title)
+
+        # Current password
         self.old_password_input = QLineEdit()
         self.old_password_input.setPlaceholderText("كلمة المرور الحالية")
         self.old_password_input.setEchoMode(QLineEdit.EchoMode.Password)
         layout.addWidget(QLabel("🔑 كلمة المرور الحالية:"))
         layout.addWidget(self.old_password_input)
 
+        # New password
         self.new_password_input = QLineEdit()
         self.new_password_input.setPlaceholderText("كلمة المرور الجديدة")
         self.new_password_input.setEchoMode(QLineEdit.EchoMode.Password)
         layout.addWidget(QLabel("🔑 كلمة المرور الجديدة:"))
         layout.addWidget(self.new_password_input)
 
+        # Change button with improved styling
         self.change_button = QPushButton("تغيير كلمة المرور")
         self.change_button.clicked.connect(self.change_password)
         self.change_button.setStyleSheet("""
             QPushButton {
-                background-color: #27ae60;
+                background-color: #28a745;
                 color: white;
-                border-radius: 5px;
-                padding: 10px;
+                border-radius: 6px;
+                padding: 12px;
                 font-weight: bold;
                 font-size: 14px;
-                margin-top: 20px;
+                margin-top: 10px;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #2ecc71;
+                background-color: #218838;
+            }
+            QPushButton:pressed {
+                background-color: #1e7e34;
             }
         """)
         layout.addWidget(self.change_button)
@@ -70,7 +86,7 @@ class ChangePasswordDialog(QDialog):
         self.setLayout(layout)
 
     def change_password(self):
-        """Change the user's password."""
+        """Change the user's password (unchanged functionality)."""
         old_password = self.old_password_input.text()
         new_password = self.new_password_input.text()
 
@@ -81,7 +97,6 @@ class ChangePasswordDialog(QDialog):
         try:
             headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
             
-            # Call the backend API to change the password
             response = requests.post(
                 "http://127.0.0.1:8000/change-password/", 
                 json={
@@ -95,6 +110,7 @@ class ChangePasswordDialog(QDialog):
                 QMessageBox.information(self, "نجاح", "تم تغيير كلمة المرور بنجاح!")
                 self.accept()
             else:
-                QMessageBox.warning(self, "خطأ", f"حدث خطأ أثناء تغيير كلمة المرور! الخطأ: {response.status_code} - {response.text}")
+                error_msg = response.json().get("detail", response.text)
+                QMessageBox.warning(self, "خطأ", f"فشل تغيير كلمة المرور: {error_msg}")
         except Exception as e:
-            QMessageBox.warning(self, "خطأ", f"تعذر الاتصال بالخادم: {str(e)}")
+            QMessageBox.critical(self, "خطأ", f"تعذر الاتصال بالخادم: {str(e)}")

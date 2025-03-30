@@ -12,6 +12,7 @@ from PyQt6.QtGui import QFont, QColor, QAction, QIcon
 from PyQt6.QtCore import Qt, QDate, pyqtSignal, QTimer
 
 from ui.user_search import UserSearchDialog
+from ui.confirm_dialog import ConfirmTransactionDialog  # Add this import
 
 class ModernGroupBox(QGroupBox):
     """Custom styled group box."""
@@ -57,7 +58,6 @@ class ModernButton(QPushButton):
     
     def lighten_color(self, color):
         """Lighten a hex color."""
-        # Simple implementation - not perfect but works for our needs
         if color.startswith('#'):
             color = color[1:]
         r = min(255, int(color[0:2], 16) + 20)
@@ -158,39 +158,24 @@ class MoneyTransferApp(QWidget):
         self.sender_mobile_input.setPlaceholderText("أدخل رقم الهاتف")
         sender_layout.addWidget(self.sender_mobile_input, 0, 3)
         
-        # Sender ID
-        sender_id_label = QLabel("رقم الهوية:")
-        sender_layout.addWidget(sender_id_label, 1, 0)
-        
-        self.sender_id_input = QLineEdit()
-        self.sender_id_input.setPlaceholderText("أدخل رقم الهوية")
-        sender_layout.addWidget(self.sender_id_input, 1, 1)
-        
-        # Sender address
-        sender_address_label = QLabel("العنوان:")
-        sender_layout.addWidget(sender_address_label, 1, 2)
-        
-        self.sender_address_input = QLineEdit()
-        self.sender_address_input.setPlaceholderText("أدخل العنوان")
-        sender_layout.addWidget(self.sender_address_input, 1, 3)
-        
         # Sender governorate
         sender_governorate_label = QLabel("المحافظة:")
-        sender_layout.addWidget(sender_governorate_label, 2, 0)
+        sender_layout.addWidget(sender_governorate_label, 1, 0)
         
         self.sender_governorate_input = QComboBox()
         self.sender_governorate_input.addItems([
-            "دمشق", "حلب", "حمص", "حماة", "اللاذقية", "طرطوس", "درعا", "السويداء", "القنيطرة", "الرقة", "دير الزور", "الحسكة", "إدلب"
+            "دمشق", "حلب", "حمص", "حماة", "اللاذقية", "طرطوس", "درعا", 
+            "السويداء", "القنيطرة", "الرقة", "دير الزور", "الحسكة", "إدلب"
         ])
-        sender_layout.addWidget(self.sender_governorate_input, 2, 1)
+        sender_layout.addWidget(self.sender_governorate_input, 1, 1)
         
         # Sender location
         sender_location_label = QLabel("المنطقة:")
-        sender_layout.addWidget(sender_location_label, 2, 2)
+        sender_layout.addWidget(sender_location_label, 1, 2)
         
         self.sender_location_input = QLineEdit()
         self.sender_location_input.setPlaceholderText("أدخل المنطقة")
-        sender_layout.addWidget(self.sender_location_input, 2, 3)
+        sender_layout.addWidget(self.sender_location_input, 1, 3)
         
         sender_group.setLayout(sender_layout)
         layout.addWidget(sender_group)
@@ -215,39 +200,24 @@ class MoneyTransferApp(QWidget):
         self.receiver_mobile_input.setPlaceholderText("أدخل رقم الهاتف")
         receiver_layout.addWidget(self.receiver_mobile_input, 0, 3)
         
-        # Receiver ID
-        receiver_id_label = QLabel("رقم الهوية:")
-        receiver_layout.addWidget(receiver_id_label, 1, 0)
-        
-        self.receiver_id_input = QLineEdit()
-        self.receiver_id_input.setPlaceholderText("أدخل رقم الهوية")
-        receiver_layout.addWidget(self.receiver_id_input, 1, 1)
-        
-        # Receiver address
-        receiver_address_label = QLabel("العنوان:")
-        receiver_layout.addWidget(receiver_address_label, 1, 2)
-        
-        self.receiver_address_input = QLineEdit()
-        self.receiver_address_input.setPlaceholderText("أدخل العنوان")
-        receiver_layout.addWidget(self.receiver_address_input, 1, 3)
-        
         # Receiver governorate
         receiver_governorate_label = QLabel("المحافظة:")
-        receiver_layout.addWidget(receiver_governorate_label, 2, 0)
+        receiver_layout.addWidget(receiver_governorate_label, 1, 0)
         
         self.receiver_governorate_input = QComboBox()
         self.receiver_governorate_input.addItems([
-            "دمشق", "حلب", "حمص", "حماة", "اللاذقية", "طرطوس", "درعا", "السويداء", "القنيطرة", "الرقة", "دير الزور", "الحسكة", "إدلب"
+            "دمشق", "حلب", "حمص", "حماة", "اللاذقية", "طرطوس", "درعا", 
+            "السويداء", "القنيطرة", "الرقة", "دير الزور", "الحسكة", "إدلب"
         ])
-        receiver_layout.addWidget(self.receiver_governorate_input, 2, 1)
+        receiver_layout.addWidget(self.receiver_governorate_input, 1, 1)
         
         # Receiver location
         receiver_location_label = QLabel("المنطقة:")
-        receiver_layout.addWidget(receiver_location_label, 2, 2)
+        receiver_layout.addWidget(receiver_location_label, 1, 2)
         
         self.receiver_location_input = QLineEdit()
         self.receiver_location_input.setPlaceholderText("أدخل المنطقة")
-        receiver_layout.addWidget(self.receiver_location_input, 2, 3)
+        receiver_layout.addWidget(self.receiver_location_input, 1, 3)
         
         receiver_group.setLayout(receiver_layout)
         layout.addWidget(receiver_group)
@@ -275,23 +245,22 @@ class MoneyTransferApp(QWidget):
         self.currency_input.addItems(["ليرة سورية", "دولار أمريكي", "يورو"])
         transfer_layout.addWidget(self.currency_input, 0, 3)
         
-        # Branch
-        branch_label = QLabel("الفرع:")
-        transfer_layout.addWidget(branch_label, 1, 0)
+        # Employee name (hidden field, auto-filled with current user)
+        self.employee_name_input = QLineEdit()
+        self.employee_name_input.setText(self.username)
+        self.employee_name_input.setVisible(False)
+        transfer_layout.addWidget(self.employee_name_input, 2, 0)
         
-        self.branch_input = QComboBox()
-        # Enable branch selection for all users to allow sending to any branch
-        self.branch_input.setEnabled(True)
-        transfer_layout.addWidget(self.branch_input, 1, 1)
+        # Branch governorate
+        branch_governorate_label = QLabel("محافظة الفرع:")
+        transfer_layout.addWidget(branch_governorate_label, 1, 0)
         
-        # Date
-        date_label = QLabel("التاريخ:")
-        transfer_layout.addWidget(date_label, 1, 2)
-        
-        self.date_input = QDateEdit()
-        self.date_input.setCalendarPopup(True)
-        self.date_input.setDate(QDate.currentDate())
-        transfer_layout.addWidget(self.date_input, 1, 3)
+        self.branch_governorate_input = QComboBox()
+        self.branch_governorate_input.addItems([
+            "دمشق", "حلب", "حمص", "حماة", "اللاذقية", "طرطوس", "درعا", 
+            "السويداء", "القنيطرة", "الرقة", "دير الزور", "الحسكة", "إدلب"
+        ])
+        transfer_layout.addWidget(self.branch_governorate_input, 1, 1)
         
         # Notes
         notes_label = QLabel("ملاحظات:")
@@ -312,329 +281,81 @@ class MoneyTransferApp(QWidget):
         clear_button.clicked.connect(self.clear_form)
         buttons_layout.addWidget(clear_button)
         
-        save_button = ModernButton("حفظ", color="#3498db")
-        save_button.clicked.connect(self.save_transfer)
-        buttons_layout.addWidget(save_button)
-        
-        submit_button = ModernButton("إرسال", color="#2ecc71")
-        submit_button.clicked.connect(self.submit_transfer)
+        submit_button = ModernButton("إرسال التحويل", color="#2ecc71")
+        submit_button.clicked.connect(self.show_confirmation)
         buttons_layout.addWidget(submit_button)
         
         layout.addLayout(buttons_layout)
         
         self.new_transfer_tab.setLayout(layout)
     
-    def setup_transactions_tab(self):
-        """Set up the transactions tab."""
-        layout = QVBoxLayout()
-        
-        # Search and filter controls
-        controls_layout = QHBoxLayout()
-        
-        # Search button
-        search_button = ModernButton("بحث", color="#3498db")
-        search_button.clicked.connect(self.open_search_dialog)
-        controls_layout.addWidget(search_button)
-        
-        # Refresh button
-        refresh_button = ModernButton("تحديث", color="#2ecc71")
-        refresh_button.clicked.connect(self.load_transactions)
-        controls_layout.addWidget(refresh_button)
-        
-        # Filter by status
-        status_label = QLabel("تصفية حسب الحالة:")
-        controls_layout.addWidget(status_label)
-        
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("الكل", "all")
-        self.status_filter.addItem("قيد الانتظار", "pending")
-        self.status_filter.addItem("قيد المعالجة", "processing")
-        self.status_filter.addItem("مكتمل", "completed")
-        self.status_filter.addItem("ملغي", "cancelled")
-        self.status_filter.addItem("مرفوض", "rejected")
-        self.status_filter.addItem("معلق", "on_hold")
-        self.status_filter.currentIndexChanged.connect(self.filter_transactions)
-        controls_layout.addWidget(self.status_filter)
-        
-        layout.addLayout(controls_layout)
-        
-        # Transactions table
-        self.transactions_table = QTableWidget()
-        self.transactions_table.setColumnCount(8)
-        self.transactions_table.setHorizontalHeaderLabels([
-            "رقم التحويل", "التاريخ", "المرسل", "المستلم", "المبلغ", "الحالة", "الموظف", "الملاحظات"
-        ])
-        self.transactions_table.horizontalHeader().setStretchLastSection(True)
-        self.transactions_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.transactions_table.setStyleSheet("""
-            QTableWidget {
-                border: 1px solid #ddd;
-                border-radius: 5px;
-                background-color: white;
-                gridline-color: #f0f0f0;
-            }
-            QHeaderView::section {
-                background-color: #2c3e50;
-                color: white;
-                padding: 8px;
-                border: none;
-                font-weight: bold;
-            }
-            QTableWidget::item {
-                padding: 5px;
-                border-bottom: 1px solid #f0f0f0;
-            }
-            QTableWidget::item:selected {
-                background-color: #3498db;
-                color: white;
-            }
-        """)
-        
-        # Connect double-click event
-        self.transactions_table.itemDoubleClicked.connect(self.show_transaction_details)
-        
-        # Connect context menu event
-        self.transactions_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.transactions_table.customContextMenuRequested.connect(self.show_context_menu)
-        
-        layout.addWidget(self.transactions_table)
-        
-        # Status bar
-        status_layout = QHBoxLayout()
-        
-        self.status_label = QLabel("جاهز")
-        status_layout.addWidget(self.status_label)
-        
-        self.count_label = QLabel("عدد التحويلات: 0")
-        status_layout.addWidget(self.count_label, alignment=Qt.AlignmentFlag.AlignRight)
-        
-        layout.addLayout(status_layout)
-        
-        self.transactions_tab.setLayout(layout)
-    
-    def load_branches(self):
-        """Load branches from the API."""
-        try:
-            headers = {"Authorization": f"Bearer {self.user_token}"} if self.user_token else {}
-            response = requests.get(f"{self.api_url}/branches/", headers=headers)
-            
-            if response.status_code == 200:
-                branches_data = response.json()
-                branches = branches_data.get("branches", [])
-                
-                # Clear and populate branch combo
-                self.branch_input.clear()
-                
-                for branch in branches:
-                    # Display branch name and governorate together
-                    branch_display = f"{branch.get('name', '')} - {branch.get('governorate', '')}"
-                    self.branch_input.addItem(branch_display, branch.get("id", ""))
-                
-                # Set current branch if branch_id is provided
-                if self.branch_id:
-                    for i in range(self.branch_input.count()):
-                        if self.branch_input.itemData(i) == self.branch_id:
-                            self.branch_input.setCurrentIndex(i)
-                            break
-            else:
-                QMessageBox.warning(self, "خطأ", f"فشل تحميل بيانات الفروع: رمز الحالة {response.status_code}")
-        except Exception as e:
-            print(f"Error loading branches: {e}")
-            QMessageBox.critical(self, "خطأ في الاتصال", 
-                               "تعذر الاتصال بالخادم. الرجاء التحقق من اتصالك بالإنترنت وحالة الخادم.")
-    
-    def load_transactions(self):
-        """Load transactions from the API."""
-        self.status_label.setText("جاري تحميل البيانات...")
-        
-        try:
-            headers = {"Authorization": f"Bearer {self.user_token}"} if self.user_token else {}
-            
-            # Build URL based on role and branch
-            url = f"{self.api_url}/transactions/"
-            if self.branch_id and self.user_role != "director":
-                url += f"?branch_id={self.branch_id}"
-            
-            response = requests.get(url, headers=headers)
-            
-            if response.status_code == 200:
-                transactions_data = response.json()
-                transactions = transactions_data.get("transactions", [])
-                
-                # Store transactions for filtering
-                self.all_transactions = transactions
-                
-                # Apply current filter
-                self.filter_transactions()
-                
-                # Update status
-                self.status_label.setText("تم تحميل البيانات بنجاح")
-                self.count_label.setText(f"عدد التحويلات: {len(transactions)}")
-            else:
-                self.status_label.setText(f"خطأ في تحميل البيانات: {response.status_code}")
-                QMessageBox.warning(self, "خطأ", f"فشل تحميل بيانات التحويلات: رمز الحالة {response.status_code}")
-        except Exception as e:
-            self.status_label.setText("خطأ في الاتصال")
-            print(f"Error loading transactions: {e}")
-            QMessageBox.critical(self, "خطأ في الاتصال", 
-                               "تعذر الاتصال بالخادم. الرجاء التحقق من اتصالك بالإنترنت وحالة الخادم.")
-    
-    def filter_transactions(self):
-        """Filter transactions based on selected status."""
-        if not hasattr(self, 'all_transactions'):
-            return
-        
-        selected_status = self.status_filter.currentData()
-        
-        if selected_status == "all":
-            filtered_transactions = self.all_transactions
-        else:
-            filtered_transactions = [t for t in self.all_transactions if t.get("status", "") == selected_status]
-        
-        # Update table
-        self.transactions_table.setRowCount(len(filtered_transactions))
-        
-        for i, transaction in enumerate(filtered_transactions):
-            # Transaction ID
-            self.transactions_table.setItem(i, 0, QTableWidgetItem(str(transaction.get("id", ""))))
-            
-            # Date
-            date_str = transaction.get("date", "")
-            formatted_date = date_str
-            try:
-                # Try to parse and format the date
-                date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-                formatted_date = date_obj.strftime("%Y-%m-%d")
-            except:
-                pass
-            self.transactions_table.setItem(i, 1, QTableWidgetItem(formatted_date))
-            
-            # Sender
-            self.transactions_table.setItem(i, 2, QTableWidgetItem(transaction.get("sender_name", "")))
-            
-            # Receiver
-            self.transactions_table.setItem(i, 3, QTableWidgetItem(transaction.get("receiver_name", "")))
-            
-            # Amount
-            amount = transaction.get("amount", 0)
-            formatted_amount = f"{float(amount):,.2f}" if amount else "0.00"
-            self.transactions_table.setItem(i, 4, QTableWidgetItem(formatted_amount))
-            
-            # Status
-            status = transaction.get("status", "pending")
-            status_arabic = self.get_status_arabic(status)
-            status_item = QTableWidgetItem(status_arabic)
-            
-            # Color-code status
-            status_item.setBackground(self.get_status_color(status))
-            self.transactions_table.setItem(i, 5, status_item)
-            
-            # Employee
-            self.transactions_table.setItem(i, 6, QTableWidgetItem(transaction.get("employee_name", "")))
-            
-            # Notes
-            self.transactions_table.setItem(i, 7, QTableWidgetItem(transaction.get("notes", "")))
-        
-        # Update count
-        self.count_label.setText(f"عدد التحويلات: {len(filtered_transactions)}")
-    
-    def get_status_arabic(self, status):
-        """Convert status to Arabic."""
-        status_map = {
-            "pending": "قيد الانتظار",
-            "processing": "قيد المعالجة",
-            "completed": "مكتمل",
-            "cancelled": "ملغي",
-            "rejected": "مرفوض",
-            "on_hold": "معلق"
-        }
-        return status_map.get(status, status)
-    
-    def get_status_color(self, status):
-        """Get color for status."""
-        status_colors = {
-            "pending": QColor(255, 255, 200),  # Light yellow
-            "processing": QColor(200, 200, 255),  # Light blue
-            "completed": QColor(200, 255, 200),  # Light green
-            "cancelled": QColor(255, 200, 200),  # Light red
-            "rejected": QColor(255, 150, 150),  # Darker red
-            "on_hold": QColor(255, 200, 150)  # Light orange
-        }
-        return status_colors.get(status, QColor(255, 255, 255))  # White default
-    
-    def clear_form(self):
-        """Clear the new transfer form."""
-        # Clear sender information
-        self.sender_name_input.clear()
-        self.sender_mobile_input.clear()
-        self.sender_id_input.clear()
-        self.sender_address_input.clear()
-        self.sender_governorate_input.setCurrentIndex(0)
-        self.sender_location_input.clear()
-        
-        # Clear receiver information
-        self.receiver_name_input.clear()
-        self.receiver_mobile_input.clear()
-        self.receiver_id_input.clear()
-        self.receiver_address_input.clear()
-        self.receiver_governorate_input.setCurrentIndex(0)
-        self.receiver_location_input.clear()
-        
-        # Clear transfer information
-        self.amount_input.setValue(0)
-        self.currency_input.setCurrentIndex(0)
-        self.date_input.setDate(QDate.currentDate())
-        self.notes_input.clear()
-    
-    def save_transfer(self):
-        """Save the transfer as a draft."""
-        # Validate required fields
+    def show_confirmation(self):
+        """Show confirmation dialog before submitting transfer."""
         if not self.validate_transfer_form():
             return
+            
+        sender = self.sender_name_input.text()
+        sender_mobile = self.sender_mobile_input.text()
+        sender_governorate = self.sender_governorate_input.currentText()
+        sender_location = self.sender_location_input.text()
         
-        # Prepare data
-        data = self.prepare_transfer_data()
-        data["status"] = "pending"  # Draft status
+        receiver = self.receiver_name_input.text()
+        receiver_mobile = self.receiver_mobile_input.text()
+        receiver_governorate = self.receiver_governorate_input.currentText()
+        receiver_location = self.receiver_location_input.text()
         
+        amount = self.amount_input.value()
+        currency = self.currency_input.currentText()
+        message = self.notes_input.toPlainText()
+        employee_name = self.employee_name_input.text()
+        branch_governorate = self.branch_governorate_input.currentText()
+        
+        # Show confirmation dialog
+        confirm_dialog = ConfirmTransactionDialog(
+            self, sender, sender_mobile, sender_governorate, sender_location,
+            receiver, receiver_mobile, receiver_governorate, receiver_location,
+            amount, currency, message, employee_name, branch_governorate
+        )
+        
+        if confirm_dialog.exec() == QDialog.DialogCode.Accepted:
+            self.process_transaction(
+                sender, sender_mobile, sender_governorate, sender_location,
+                receiver, receiver_mobile, receiver_governorate, receiver_location,
+                amount, currency, message, employee_name, branch_governorate
+            )
+    
+    def process_transaction(self, sender, sender_mobile, sender_governorate, sender_location,
+                          receiver, receiver_mobile, receiver_governorate, receiver_location,
+                          amount, currency, message, employee_name, branch_governorate):
+        """Process the transaction after confirmation."""
         try:
             headers = {"Authorization": f"Bearer {self.user_token}"} if self.user_token else {}
+            
+            data = {
+                "sender": sender,
+                "sender_mobile": sender_mobile,
+                "sender_governorate": sender_governorate,
+                "sender_location": sender_location,
+                "receiver": receiver,
+                "receiver_mobile": receiver_mobile,
+                "receiver_governorate": receiver_governorate,
+                "receiver_location": receiver_location,
+                "amount": amount,
+                "currency": currency,
+                "message": message,
+                "employee_name": employee_name,
+                "branch_governorate": branch_governorate,
+                "status": "processing"  # Default status
+            }
+            
             response = requests.post(f"{self.api_url}/transactions/", json=data, headers=headers)
             
             if response.status_code == 201:
-                QMessageBox.information(self, "نجاح", "تم حفظ التحويل بنجاح")
-                self.clear_form()
-                self.load_transactions()
-            else:
-                error_msg = f"فشل حفظ التحويل: رمز الحالة {response.status_code}"
-                try:
-                    error_data = response.json()
-                    if "detail" in error_data:
-                        error_msg = error_data["detail"]
-                except:
-                    pass
-                
-                QMessageBox.warning(self, "خطأ", error_msg)
-        except Exception as e:
-            print(f"Error saving transfer: {e}")
-            QMessageBox.critical(self, "خطأ في الاتصال", 
-                               "تعذر الاتصال بالخادم. الرجاء التحقق من اتصالك بالإنترنت وحالة الخادم.")
-    
-    def submit_transfer(self):
-        """Submit the transfer for processing."""
-        # Validate required fields
-        if not self.validate_transfer_form():
-            return
-        
-        # Prepare data
-        data = self.prepare_transfer_data()
-        data["status"] = "processing"  # Processing status
-        
-        try:
-            headers = {"Authorization": f"Bearer {self.user_token}"} if self.user_token else {}
-            response = requests.post(f"{self.api_url}/transactions/", json=data, headers=headers)
-            
-            if response.status_code == 201:
-                QMessageBox.information(self, "نجاح", "تم إرسال التحويل بنجاح")
+                transaction_data = response.json()
+                QMessageBox.information(
+                    self, "نجاح", 
+                    f"تم إرسال التحويل بنجاح!\nرقم التحويل: {transaction_data.get('id', '')}"
+                )
                 self.clear_form()
                 self.load_transactions()
             else:
@@ -642,47 +363,35 @@ class MoneyTransferApp(QWidget):
                 try:
                     error_data = response.json()
                     if "detail" in error_data:
-                        if isinstance(error_data["detail"], list):
-                            # Handle multiple validation errors
-                            errors = [f"{err['loc'][-1]}: {err['msg']}" for err in error_data["detail"]]
-                            error_msg += "\n" + "\n".join(errors)
-                        else:
-                            error_msg += f"\nالتفاصيل: {error_data['detail']}"
+                        error_msg += f"\n{error_data['detail']}"
                 except:
                     pass
                 QMessageBox.warning(self, "خطأ", error_msg)
-                
-                QMessageBox.warning(self, "خطأ", error_msg)
         except Exception as e:
-            print(f"Error submitting transfer: {e}")
-            QMessageBox.critical(self, "خطأ في الاتصال", 
-                            "تعذر الاتصال بالخادم. الرجاء التحقق من اتصالك بالإنترنت وحالة الخادم.")
+            QMessageBox.critical(self, "خطأ في الاتصال", f"تعذر الاتصال بالخادم: {str(e)}")
     
     def validate_transfer_form(self):
-        """Validate the transfer form."""
-        # Validate sender information
-        if not self.sender_name_input.text():
-            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال اسم المرسل")
-            return False
+        """Validate the transfer form fields."""
+        required_fields = [
+            (self.sender_name_input, "اسم المرسل"),
+            (self.sender_mobile_input, "رقم هاتف المرسل"),
+            (self.sender_location_input, "موقع المرسل"),
+            (self.receiver_name_input, "اسم المستلم"),
+            (self.receiver_mobile_input, "رقم هاتف المستلم"),
+            (self.receiver_location_input, "موقع المستلم")
+        ]
         
-        if not self.sender_mobile_input.text():
-            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال رقم هاتف المرسل")
-            return False
+        for field, name in required_fields:
+            if not field.text().strip():
+                QMessageBox.warning(self, "حقل مطلوب", f"الرجاء إدخال {name}")
+                field.setFocus()
+                return False
         
-        # Validate receiver information
-        if not self.receiver_name_input.text():
-            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال اسم المستلم")
-            return False
-        
-        if not self.receiver_mobile_input.text():
-            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال رقم هاتف المستلم")
-            return False
-        
-        # Validate amount
         if self.amount_input.value() <= 0:
-            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال مبلغ صحيح")
+            QMessageBox.warning(self, "مبلغ غير صحيح", "الرجاء إدخال مبلغ صحيح أكبر من الصفر")
+            self.amount_input.setFocus()
             return False
-        
+            
         return True
     
     def prepare_transfer_data(self):
@@ -692,35 +401,32 @@ class MoneyTransferApp(QWidget):
         if self.user_role == "director":
             branch_id = self.branch_input.currentData()
         
-        # Get branch governorate
-        branch_governorate = self.sender_governorate_input.currentText()
-        if self.user_role != "director":
-            # For non-directors, use the branch's governorate
-            branch_index = self.branch_input.currentIndex()
-            branch_text = self.branch_input.currentText()
-            if " - " in branch_text:
-                branch_governorate = branch_text.split(" - ")[1]
-
         # Prepare data according to Transaction model
         data = {
+            # Sender information
             "sender": self.sender_name_input.text(),
             "sender_mobile": self.sender_mobile_input.text(),
             "sender_governorate": self.sender_governorate_input.currentText(),
             "sender_location": self.sender_location_input.text(),
             
+            # Receiver information
             "receiver": self.receiver_name_input.text(),
             "receiver_mobile": self.receiver_mobile_input.text(),
             "receiver_governorate": self.receiver_governorate_input.currentText(),
             "receiver_location": self.receiver_location_input.text(),
             
+            # Transaction details
             "amount": float(self.amount_input.value()),
             "currency": self.currency_input.currentText(),
             "message": self.notes_input.toPlainText(),
             
+            # Employee/branch info
             "employee_name": self.username,
-            "branch_governorate": branch_governorate
+            "branch_governorate": self.sender_governorate_input.currentText()
         }
         
+        # Debug: Print the data being sent
+        print("Prepared transaction data:", data)
         return data
     
     def show_transaction_details(self, item):

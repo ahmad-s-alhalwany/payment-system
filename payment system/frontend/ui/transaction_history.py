@@ -2,53 +2,60 @@ import sys
 import requests
 from datetime import datetime
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-    QPushButton, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView,
-    QMessageBox, QDialog, QLineEdit, QFormLayout, QComboBox, QGroupBox,
-    QGridLayout, QDateEdit, QSpinBox, QDoubleSpinBox, QCheckBox, QMenu,
-    QStatusBar, QSplitter, QFrame
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, 
+    QTableWidgetItem, QComboBox, QMessageBox, QGroupBox, QFormLayout, 
+    QDateEdit, QDoubleSpinBox, QCheckBox, QMenu, QStatusBar
 )
-from PyQt6.QtGui import QFont, QColor, QAction, QIcon
-from PyQt6.QtCore import Qt, QDate, pyqtSignal, QTimer
+from PyQt6.QtGui import QColor, QAction, QFont
+from PyQt6.QtCore import Qt, QDate, QTimer
 
-from ui.user_search import UserSearchDialog
+TRANSACTIONS_API_URL = "http://127.0.0.1:8000/transactions/"
 
-class TransactionHistory(QWidget):
-    """Widget for displaying and managing transaction history."""
+class TransactionHistory(QDialog):
+    """Enhanced transaction history dialog combining best features of both versions."""
     
-    def __init__(self, user_token=None, branch_id=None, user_id=None, user_role="employee", api_url="http://127.0.0.1:8000"):
+    def __init__(self, branch_id=None, token=None, user_role="employee"):
         super().__init__()
-        self.user_token = user_token
         self.branch_id = branch_id
-        self.user_id = user_id
+        self.token = token
         self.user_role = user_role
-        self.api_url = api_url
+        
+        self.setWindowTitle("سجل التحويلات")
+        self.setGeometry(150, 150, 1000, 600)
         
         self.setup_ui()
         self.load_transactions()
         
-        # Set up refresh timer (every 2 minutes)
+        # Set up auto-refresh timer (every 2 minutes)
         self.refresh_timer = QTimer(self)
         self.refresh_timer.timeout.connect(self.load_transactions)
-        self.refresh_timer.start(120000)  # 2 minutes in milliseconds
+        self.refresh_timer.start(120000)
     
     def setup_ui(self):
-        """Set up the UI components."""
+        """Set up the UI components with improved design."""
         layout = QVBoxLayout()
         
-        # Header
+        # Header with filter controls
         header_layout = QHBoxLayout()
         
-        title_label = QLabel("سجل التحويلات")
-        title_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        title_label.setStyleSheet("color: #2c3e50;")
-        header_layout.addWidget(title_label)
+        # Filter dropdown (from old version)
+        self.filter_dropdown = QComboBox()
+        self.filter_dropdown.addItems([
+            "جميع التحويلات", 
+            "التحويلات الواردة", 
+            "التحويلات الصادرة",
+            "التحويلات المتعلقة بالفرع"
+        ])
+        self.filter_dropdown.setCurrentIndex(3)  # Default to branch-related
+        self.filter_dropdown.currentIndexChanged.connect(self.load_transactions)
+        header_layout.addWidget(QLabel("تصفية:"))
+        header_layout.addWidget(self.filter_dropdown)
         
-        # Add spacer to push buttons to the right
+        # Spacer
         header_layout.addStretch()
         
-        # Filter button
-        self.filter_button = QPushButton("تصفية")
+        # Buttons (from new version)
+        self.filter_button = QPushButton("تصفية متقدمة")
         self.filter_button.setStyleSheet("""
             QPushButton {
                 background-color: #3498db;
@@ -61,10 +68,9 @@ class TransactionHistory(QWidget):
                 background-color: #2980b9;
             }
         """)
-        self.filter_button.clicked.connect(self.show_filter_dialog)
+        self.filter_button.clicked.connect(self.show_advanced_filter)
         header_layout.addWidget(self.filter_button)
         
-        # Refresh button
         self.refresh_button = QPushButton("تحديث")
         self.refresh_button.setStyleSheet("""
             QPushButton {
@@ -81,7 +87,6 @@ class TransactionHistory(QWidget):
         self.refresh_button.clicked.connect(self.load_transactions)
         header_layout.addWidget(self.refresh_button)
         
-        # Export button
         self.export_button = QPushButton("تصدير")
         self.export_button.setStyleSheet("""
             QPushButton {
@@ -100,15 +105,17 @@ class TransactionHistory(QWidget):
         
         layout.addLayout(header_layout)
         
-        # Transactions table
-        self.transactions_table = QTableWidget()
-        self.transactions_table.setColumnCount(8)
-        self.transactions_table.setHorizontalHeaderLabels([
-            "رقم التحويل", "التاريخ", "المرسل", "المستلم", "المبلغ", "الحالة", "الموظف", "الملاحظات"
+        # Transactions table (combining both versions)
+        self.table = QTableWidget()
+        self.table.setColumnCount(15)
+        self.table.setHorizontalHeaderLabels([
+            "رقم العملية", "المرسل", "رقم المرسل", "المحافظة (المرسل)", "الموقع (المرسل)",
+            "المستلم", "رقم المستلم", "المحافظة (المستلم)", "الموقع (المستلم)", "المبلغ", 
+            "العملة", "نوع التحويل", "الرسالة", "اسم الموظف", "التاريخ"
         ])
-        self.transactions_table.horizontalHeader().setStretchLastSection(True)
-        self.transactions_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.transactions_table.setStyleSheet("""
+        
+        # Styling from new version
+        self.table.setStyleSheet("""
             QTableWidget {
                 border: 1px solid #ddd;
                 border-radius: 5px;
@@ -132,432 +139,260 @@ class TransactionHistory(QWidget):
             }
         """)
         
-        # Connect double-click event
-        self.transactions_table.itemDoubleClicked.connect(self.show_transaction_details)
+        # Enable sorting
+        self.table.setSortingEnabled(True)
         
-        # Connect context menu event
-        self.transactions_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.transactions_table.customContextMenuRequested.connect(self.show_context_menu)
+        # Resize columns to content
+        self.table.resizeColumnsToContents()
+        self.table.horizontalHeader().setStretchLastSection(True)
         
-        layout.addWidget(self.transactions_table)
+        # Connect double-click and context menu
+        self.table.itemDoubleClicked.connect(self.show_transaction_details)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self.show_context_menu)
         
-        # Status bar
+        layout.addWidget(self.table)
+        
+        # Status bar (from new version)
         status_layout = QHBoxLayout()
         
         self.status_label = QLabel("جاهز")
+        self.status_label.setFont(QFont("Arial", 10))
         status_layout.addWidget(self.status_label)
         
         self.count_label = QLabel("عدد التحويلات: 0")
+        self.count_label.setFont(QFont("Arial", 10))
         status_layout.addWidget(self.count_label, alignment=Qt.AlignmentFlag.AlignRight)
         
         layout.addLayout(status_layout)
         
         self.setLayout(layout)
     
+    def get_filter_type(self, index):
+        """Convert dropdown index to API filter type (from old version)."""
+        filter_types = ["all", "incoming", "outgoing", "branch_related"]
+        return filter_types[index] if 0 <= index < len(filter_types) else "branch_related"
+    
+    def determine_transaction_type(self, transaction):
+        """Determine transaction type (from old version)."""
+        if str(transaction.get("branch_id")) == str(self.branch_id):
+            return "صادر"  # Outgoing
+        elif transaction.get("receiver_governorate") == transaction.get("branch_governorate"):
+            return "وارد"  # Incoming
+        return "غير مرتبط"  # Not related
+    
     def load_transactions(self):
-        """Load transactions from the API."""
+        """Load transactions with error handling (combined from both versions)."""
         self.status_label.setText("جاري تحميل البيانات...")
         
         try:
-            headers = {"Authorization": f"Bearer {self.user_token}"} if self.user_token else {}
+            # Get filter type from dropdown
+            filter_index = self.filter_dropdown.currentIndex()
+            filter_type = self.get_filter_type(filter_index)
             
-            # Build URL based on role and branch
-            url = f"{self.api_url}/transactions/"
-            if self.branch_id and self.user_role != "director":
-                url += f"?branch_id={self.branch_id}"
+            # Build request URL
+            url = TRANSACTIONS_API_URL
+            if self.branch_id:
+                url = f"{TRANSACTIONS_API_URL}?branch_id={self.branch_id}&filter_type={filter_type}"
             
-            response = requests.get(url, headers=headers)
+            # Add advanced filters if any
+            if hasattr(self, 'advanced_filters'):
+                for key, value in self.advanced_filters.items():
+                    url += f"&{key}={value}"
+            
+            headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
+            response = requests.get(url, headers=headers, timeout=5)
             
             if response.status_code == 200:
-                transactions_data = response.json()
-                transactions = transactions_data.get("transactions", [])
+                data = response.json().get("transactions", [])
                 
-                # Update table
-                self.transactions_table.setRowCount(len(transactions))
+                self.table.setRowCount(len(data))
                 
-                for i, transaction in enumerate(transactions):
-                    # Transaction ID
-                    self.transactions_table.setItem(i, 0, QTableWidgetItem(str(transaction.get("id", ""))))
-                    
-                    # Date
-                    date_str = transaction.get("date", "")
-                    formatted_date = date_str
-                    try:
-                        # Try to parse and format the date
-                        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-                        formatted_date = date_obj.strftime("%Y-%m-%d")
-                    except:
-                        pass
-                    self.transactions_table.setItem(i, 1, QTableWidgetItem(formatted_date))
-                    
-                    # Sender
-                    self.transactions_table.setItem(i, 2, QTableWidgetItem(transaction.get("sender_name", "")))
-                    
-                    # Receiver
-                    self.transactions_table.setItem(i, 3, QTableWidgetItem(transaction.get("receiver_name", "")))
-                    
-                    # Amount
-                    amount = transaction.get("amount", 0)
-                    formatted_amount = f"{float(amount):,.2f}" if amount else "0.00"
-                    self.transactions_table.setItem(i, 4, QTableWidgetItem(formatted_amount))
-                    
-                    # Status
-                    status = transaction.get("status", "pending")
-                    status_arabic = self.get_status_arabic(status)
-                    status_item = QTableWidgetItem(status_arabic)
-                    
-                    # Color-code status
-                    status_item.setBackground(self.get_status_color(status))
-                    self.transactions_table.setItem(i, 5, status_item)
-                    
-                    # Employee
-                    self.transactions_table.setItem(i, 6, QTableWidgetItem(transaction.get("employee_name", "")))
-                    
-                    # Notes
-                    self.transactions_table.setItem(i, 7, QTableWidgetItem(transaction.get("notes", "")))
+                for row_idx, transaction in enumerate(data):
+                    self.set_table_data(row_idx, transaction)
                 
-                # Update status
                 self.status_label.setText("تم تحميل البيانات بنجاح")
-                self.count_label.setText(f"عدد التحويلات: {len(transactions)}")
+                self.count_label.setText(f"عدد التحويلات: {len(data)}")
+                
             else:
-                self.status_label.setText(f"خطأ في تحميل البيانات: {response.status_code}")
-                QMessageBox.warning(self, "خطأ", f"فشل تحميل بيانات التحويلات: رمز الحالة {response.status_code}")
+                error_msg = response.json().get('detail', response.text)
+                self.status_label.setText("فشل في تحميل البيانات")
+                QMessageBox.warning(self, "خطأ", f"حدث خطأ أثناء تحميل البيانات:\n{error_msg}")
+                
         except Exception as e:
             self.status_label.setText("خطأ في الاتصال")
-            print(f"Error loading transactions: {e}")
-            QMessageBox.critical(self, "خطأ في الاتصال", 
-                               "تعذر الاتصال بالخادم. الرجاء التحقق من اتصالك بالإنترنت وحالة الخادم.")
+            QMessageBox.critical(self, "خطأ", f"تعذر الاتصال بالخادم:\n{str(e)}")
     
-    def get_status_arabic(self, status):
-        """Convert status to Arabic."""
-        status_map = {
-            "pending": "قيد الانتظار",
-            "processing": "قيد المعالجة",
-            "completed": "مكتمل",
-            "cancelled": "ملغي",
-            "rejected": "مرفوض",
-            "on_hold": "معلق"
-        }
-        return status_map.get(status, status)
+    def set_table_data(self, row_idx, transaction):
+        """Populate table row with transaction data (from old version with enhancements)."""
+        # Transaction ID
+        self.table.setItem(row_idx, 0, QTableWidgetItem(str(transaction.get("id", ""))))
+        
+        # Sender info
+        self.table.setItem(row_idx, 1, QTableWidgetItem(transaction.get("sender", "")))
+        self.table.setItem(row_idx, 2, QTableWidgetItem(transaction.get("sender_mobile", "")))
+        self.table.setItem(row_idx, 3, QTableWidgetItem(transaction.get("sender_governorate", "")))
+        self.table.setItem(row_idx, 4, QTableWidgetItem(transaction.get("sender_location", "N/A")))
+        
+        # Receiver info
+        self.table.setItem(row_idx, 5, QTableWidgetItem(transaction.get("receiver", "")))
+        self.table.setItem(row_idx, 6, QTableWidgetItem(transaction.get("receiver_mobile", "")))
+        self.table.setItem(row_idx, 7, QTableWidgetItem(transaction.get("receiver_governorate", "")))
+        self.table.setItem(row_idx, 8, QTableWidgetItem(transaction.get("receiver_location", "N/A")))
+        
+        # Amount and currency
+        amount = transaction.get("amount", 0)
+        self.table.setItem(row_idx, 9, QTableWidgetItem(f"{float(amount):,.2f}" if amount else "0.00"))
+        self.table.setItem(row_idx, 10, QTableWidgetItem(transaction.get("currency", "")))
+        
+        # Transaction type with coloring
+        transaction_type = self.determine_transaction_type(transaction)
+        type_item = QTableWidgetItem(transaction_type)
+        
+        if transaction_type == "وارد":
+            type_item.setBackground(QColor("#d5f5e3"))  # Light green
+        elif transaction_type == "صادر":
+            type_item.setBackground(QColor("#fadbd8"))  # Light red
+        
+        self.table.setItem(row_idx, 11, type_item)
+        
+        # Message, employee, and date
+        self.table.setItem(row_idx, 12, QTableWidgetItem(transaction.get("message", "")))
+        self.table.setItem(row_idx, 13, QTableWidgetItem(transaction.get("employee_name", "N/A")))
+        
+        # Format date properly
+        date_str = transaction.get("date", "")
+        try:
+            date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+            formatted_date = date_obj.strftime("%Y-%m-%d")
+        except:
+            formatted_date = date_str
+        self.table.setItem(row_idx, 14, QTableWidgetItem(formatted_date))
     
-    def get_status_color(self, status):
-        """Get color for status."""
-        status_colors = {
-            "pending": QColor(255, 255, 200),  # Light yellow
-            "processing": QColor(200, 200, 255),  # Light blue
-            "completed": QColor(200, 255, 200),  # Light green
-            "cancelled": QColor(255, 200, 200),  # Light red
-            "rejected": QColor(255, 150, 150),  # Darker red
-            "on_hold": QColor(255, 200, 150)  # Light orange
-        }
-        return status_colors.get(status, QColor(255, 255, 255))  # White default
+    def show_advanced_filter(self):
+        """Show advanced filter dialog (from new version)."""
+        filter_dialog = TransactionFilterDialog(self)
+        if filter_dialog.exec() == QDialog.DialogCode.Accepted:
+            self.advanced_filters = filter_dialog.get_filters()
+            self.load_transactions()
     
     def show_transaction_details(self, item):
-        """Show transaction details when an item is double-clicked."""
+        """Show transaction details dialog (from new version with old data)."""
         row = item.row()
-        transaction_id = self.transactions_table.item(row, 0).text()
+        transaction_id = self.table.item(row, 0).text()
         
         try:
-            headers = {"Authorization": f"Bearer {self.user_token}"} if self.user_token else {}
-            response = requests.get(f"{self.api_url}/transactions/{transaction_id}", headers=headers)
+            headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
+            response = requests.get(f"{TRANSACTIONS_API_URL}{transaction_id}", headers=headers)
             
             if response.status_code == 200:
                 transaction = response.json()
-                
-                # Create and show details dialog
                 details_dialog = TransactionDetailsDialog(transaction, self)
                 details_dialog.exec()
             else:
-                QMessageBox.warning(self, "خطأ", f"فشل تحميل تفاصيل التحويل: رمز الحالة {response.status_code}")
+                QMessageBox.warning(self, "خطأ", "فشل تحميل تفاصيل التحويل")
+                
         except Exception as e:
-            print(f"Error loading transaction details: {e}")
-            QMessageBox.critical(self, "خطأ في الاتصال", 
-                               "تعذر الاتصال بالخادم. الرجاء التحقق من اتصالك بالإنترنت وحالة الخادم.")
+            QMessageBox.critical(self, "خطأ", f"تعذر الاتصال بالخادم:\n{str(e)}")
     
     def show_context_menu(self, position):
-        """Show context menu for transactions table."""
-        # Only show context menu if a row is selected
-        if not self.transactions_table.selectedItems():
+        """Show context menu for transactions (from new version)."""
+        if not self.table.selectedItems():
             return
         
-        row = self.transactions_table.selectedItems()[0].row()
-        transaction_id = self.transactions_table.item(row, 0).text()
-        current_status = self.transactions_table.item(row, 5).text()
+        row = self.table.selectedItems()[0].row()
+        transaction_id = self.table.item(row, 0).text()
         
-        # Create context menu
-        context_menu = QMenu(self)
+        menu = QMenu(self)
         
         # View details action
         view_action = QAction("عرض التفاصيل", self)
-        view_action.triggered.connect(lambda: self.show_transaction_details(self.transactions_table.item(row, 0)))
-        context_menu.addAction(view_action)
+        view_action.triggered.connect(lambda: self.show_transaction_details(self.table.item(row, 0)))
+        menu.addAction(view_action)
         
-        # Change status action (only for managers and directors)
+        # Status change actions for managers/directors
         if self.user_role in ["branch_manager", "director"]:
-            change_status_menu = QMenu("تغيير الحالة", self)
+            status_menu = QMenu("تغيير الحالة", self)
             
-            # Add status options
             statuses = [
-                ("قيد الانتظار", "pending"),
-                ("قيد المعالجة", "processing"),
-                ("مكتمل", "completed"),
-                ("ملغي", "cancelled"),
-                ("مرفوض", "rejected"),
-                ("معلق", "on_hold")
+                ("إلى قيد الانتظار", "pending"),
+                ("إلى قيد المعالجة", "processing"),
+                ("إلى مكتمل", "completed"),
+                ("إلى ملغي", "cancelled")
             ]
             
-            for status_arabic, status_code in statuses:
-                if status_arabic != current_status:  # Don't show current status
-                    status_action = QAction(status_arabic, self)
-                    status_action.triggered.connect(
-                        lambda checked, tid=transaction_id, status=status_code: 
-                        self.update_transaction_status(tid, status)
-                    )
-                    change_status_menu.addAction(status_action)
+            for text, status in statuses:
+                action = QAction(text, self)
+                action.triggered.connect(
+                    lambda checked, tid=transaction_id, s=status: self.update_transaction_status(tid, s))
+                status_menu.addAction(action)
             
-            context_menu.addMenu(change_status_menu)
+            menu.addMenu(status_menu)
         
-        # Print action
-        print_action = QAction("طباعة", self)
-        print_action.triggered.connect(lambda: self.print_transaction(transaction_id))
-        context_menu.addAction(print_action)
-        
-        # Show the context menu
-        context_menu.exec(self.transactions_table.mapToGlobal(position))
+        menu.exec(self.table.mapToGlobal(position))
     
     def update_transaction_status(self, transaction_id, new_status):
-        """Update the status of a transaction."""
+        """Update transaction status (from new version)."""
         try:
-            headers = {"Authorization": f"Bearer {self.user_token}"} if self.user_token else {}
-            data = {
-                "transaction_id": transaction_id,
-                "status": new_status
-            }
-            response = requests.post(f"{self.api_url}/update-transaction-status/", json=data, headers=headers)
+            headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
+            data = {"status": new_status}
+            
+            response = requests.patch(
+                f"{TRANSACTIONS_API_URL}{transaction_id}/status/",
+                json=data,
+                headers=headers
+            )
             
             if response.status_code == 200:
                 QMessageBox.information(self, "نجاح", "تم تحديث حالة التحويل بنجاح")
-                self.load_transactions()  # Refresh the list
+                self.load_transactions()
             else:
-                QMessageBox.warning(self, "خطأ", f"فشل تحديث حالة التحويل: رمز الحالة {response.status_code}")
+                QMessageBox.warning(self, "خطأ", "فشل تحديث حالة التحويل")
+                
         except Exception as e:
-            print(f"Error updating transaction status: {e}")
-            QMessageBox.critical(self, "خطأ في الاتصال", 
-                               "تعذر الاتصال بالخادم. الرجاء التحقق من اتصالك بالإنترنت وحالة الخادم.")
-    
-    def print_transaction(self, transaction_id):
-        """Print a transaction."""
-        # This is a placeholder - in a real app, you would implement actual printing
-        QMessageBox.information(self, "طباعة", f"سيتم طباعة التحويل رقم {transaction_id}")
-    
-    def show_filter_dialog(self):
-        """Show dialog for filtering transactions."""
-        filter_dialog = TransactionFilterDialog(self)
-        if filter_dialog.exec() == QDialog.DialogCode.Accepted:
-            self.apply_filters(filter_dialog.get_filters())
-    
-    def apply_filters(self, filters):
-        """Apply filters to transactions."""
-        self.status_label.setText("جاري تطبيق التصفية...")
-        
-        try:
-            headers = {"Authorization": f"Bearer {self.user_token}"} if self.user_token else {}
-            
-            # Build URL with query parameters
-            url = f"{self.api_url}/transactions/"
-            query_params = []
-            
-            if self.branch_id and self.user_role != "director":
-                query_params.append(f"branch_id={self.branch_id}")
-            
-            if filters.get("start_date"):
-                query_params.append(f"start_date={filters['start_date']}")
-            
-            if filters.get("end_date"):
-                query_params.append(f"end_date={filters['end_date']}")
-            
-            if filters.get("status"):
-                query_params.append(f"status={filters['status']}")
-            
-            if filters.get("min_amount"):
-                query_params.append(f"min_amount={filters['min_amount']}")
-            
-            if filters.get("max_amount"):
-                query_params.append(f"max_amount={filters['max_amount']}")
-            
-            if filters.get("sender"):
-                query_params.append(f"sender={filters['sender']}")
-            
-            if filters.get("receiver"):
-                query_params.append(f"receiver={filters['receiver']}")
-            
-            if query_params:
-                url += "?" + "&".join(query_params)
-            
-            response = requests.get(url, headers=headers)
-            
-            if response.status_code == 200:
-                transactions_data = response.json()
-                transactions = transactions_data.get("transactions", [])
-                
-                # Update table
-                self.transactions_table.setRowCount(len(transactions))
-                
-                for i, transaction in enumerate(transactions):
-                    # Transaction ID
-                    self.transactions_table.setItem(i, 0, QTableWidgetItem(str(transaction.get("id", ""))))
-                    
-                    # Date
-                    date_str = transaction.get("date", "")
-                    formatted_date = date_str
-                    try:
-                        # Try to parse and format the date
-                        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-                        formatted_date = date_obj.strftime("%Y-%m-%d")
-                    except:
-                        pass
-                    self.transactions_table.setItem(i, 1, QTableWidgetItem(formatted_date))
-                    
-                    # Sender
-                    self.transactions_table.setItem(i, 2, QTableWidgetItem(transaction.get("sender_name", "")))
-                    
-                    # Receiver
-                    self.transactions_table.setItem(i, 3, QTableWidgetItem(transaction.get("receiver_name", "")))
-                    
-                    # Amount
-                    amount = transaction.get("amount", 0)
-                    formatted_amount = f"{float(amount):,.2f}" if amount else "0.00"
-                    self.transactions_table.setItem(i, 4, QTableWidgetItem(formatted_amount))
-                    
-                    # Status
-                    status = transaction.get("status", "pending")
-                    status_arabic = self.get_status_arabic(status)
-                    status_item = QTableWidgetItem(status_arabic)
-                    
-                    # Color-code status
-                    status_item.setBackground(self.get_status_color(status))
-                    self.transactions_table.setItem(i, 5, status_item)
-                    
-                    # Employee
-                    self.transactions_table.setItem(i, 6, QTableWidgetItem(transaction.get("employee_name", "")))
-                    
-                    # Notes
-                    self.transactions_table.setItem(i, 7, QTableWidgetItem(transaction.get("notes", "")))
-                
-                # Update status
-                self.status_label.setText("تم تطبيق التصفية بنجاح")
-                self.count_label.setText(f"عدد التحويلات: {len(transactions)}")
-            else:
-                self.status_label.setText(f"خطأ في تطبيق التصفية: {response.status_code}")
-                QMessageBox.warning(self, "خطأ", f"فشل تطبيق التصفية: رمز الحالة {response.status_code}")
-        except Exception as e:
-            self.status_label.setText("خطأ في الاتصال")
-            print(f"Error applying filters: {e}")
-            QMessageBox.critical(self, "خطأ في الاتصال", 
-                               "تعذر الاتصال بالخادم. الرجاء التحقق من اتصالك بالإنترنت وحالة الخادم.")
+            QMessageBox.critical(self, "خطأ", f"تعذر الاتصال بالخادم:\n{str(e)}")
     
     def export_transactions(self):
-        """Export transactions to a file."""
-        # This is a placeholder - in a real app, you would implement actual export functionality
-        QMessageBox.information(self, "تصدير", "سيتم تصدير التحويلات إلى ملف")
+        """Export transactions to file (placeholder)."""
+        QMessageBox.information(self, "تصدير", "سيتم تصدير البيانات إلى ملف Excel")
 
 class TransactionDetailsDialog(QDialog):
-    """Dialog for displaying transaction details."""
+    """Transaction details dialog (from new version with old data fields)."""
     
     def __init__(self, transaction, parent=None):
         super().__init__(parent)
         self.transaction = transaction
         
         self.setWindowTitle("تفاصيل التحويل")
-        self.setGeometry(300, 300, 500, 400)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #f5f5f5;
-                font-family: Arial;
-            }
-            QLabel {
-                color: #333;
-            }
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #3498db;
-                border-radius: 5px;
-                margin-top: 1em;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-                color: #3498db;
-            }
-        """)
+        self.setGeometry(300, 300, 500, 500)
         
         self.setup_ui()
     
     def setup_ui(self):
-        """Set up the UI components."""
+        """Set up the details UI."""
         layout = QVBoxLayout()
         
         # Transaction info group
-        transaction_group = QGroupBox("معلومات التحويل")
-        transaction_layout = QFormLayout()
+        trans_group = QGroupBox("معلومات التحويل")
+        trans_layout = QFormLayout()
         
-        # Transaction ID
-        transaction_id_label = QLabel("رقم التحويل:")
-        transaction_id_value = QLabel(str(self.transaction.get("id", "")))
-        transaction_id_value.setStyleSheet("font-weight: bold;")
-        transaction_layout.addRow(transaction_id_label, transaction_id_value)
+        trans_layout.addRow("رقم التحويل:", QLabel(str(self.transaction.get("id", ""))))
+        trans_layout.addRow("التاريخ:", QLabel(self.transaction.get("date", "")))
+        trans_layout.addRow("المبلغ:", QLabel(f"{float(self.transaction.get('amount', 0)):,.2f}"))
+        trans_layout.addRow("العملة:", QLabel(self.transaction.get("currency", "")))
+        trans_layout.addRow("الحالة:", QLabel(self.transaction.get("status", "")))
         
-        # Date
-        date_label = QLabel("التاريخ:")
-        date_value = QLabel(self.transaction.get("date", ""))
-        date_value.setStyleSheet("font-weight: bold;")
-        transaction_layout.addRow(date_label, date_value)
-        
-        # Amount
-        amount_label = QLabel("المبلغ:")
-        amount = self.transaction.get("amount", 0)
-        formatted_amount = f"{float(amount):,.2f}" if amount else "0.00"
-        amount_value = QLabel(formatted_amount)
-        amount_value.setStyleSheet("font-weight: bold;")
-        transaction_layout.addRow(amount_label, amount_value)
-        
-        # Status
-        status_label = QLabel("الحالة:")
-        status = self.transaction.get("status", "pending")
-        status_arabic = self.get_status_arabic(status)
-        status_value = QLabel(status_arabic)
-        status_value.setStyleSheet(f"font-weight: bold; color: {self.get_status_text_color(status)};")
-        transaction_layout.addRow(status_label, status_value)
-        
-        transaction_group.setLayout(transaction_layout)
-        layout.addWidget(transaction_group)
+        trans_group.setLayout(trans_layout)
+        layout.addWidget(trans_group)
         
         # Sender info group
         sender_group = QGroupBox("معلومات المرسل")
         sender_layout = QFormLayout()
         
-        # Sender name
-        sender_name_label = QLabel("الاسم:")
-        sender_name_value = QLabel(self.transaction.get("sender_name", ""))
-        sender_name_value.setStyleSheet("font-weight: bold;")
-        sender_layout.addRow(sender_name_label, sender_name_value)
-        
-        # Sender mobile
-        sender_mobile_label = QLabel("رقم الهاتف:")
-        sender_mobile_value = QLabel(self.transaction.get("sender_mobile", ""))
-        sender_layout.addRow(sender_mobile_label, sender_mobile_value)
-        
-        # Sender ID
-        sender_id_label = QLabel("رقم الهوية:")
-        sender_id_value = QLabel(self.transaction.get("sender_id", ""))
-        sender_layout.addRow(sender_id_label, sender_id_value)
-        
-        # Sender address
-        sender_address_label = QLabel("العنوان:")
-        sender_address_value = QLabel(self.transaction.get("sender_address", ""))
-        sender_layout.addRow(sender_address_label, sender_address_value)
+        sender_layout.addRow("الاسم:", QLabel(self.transaction.get("sender", "")))
+        sender_layout.addRow("رقم الهاتف:", QLabel(self.transaction.get("sender_mobile", "")))
+        sender_layout.addRow("المحافظة:", QLabel(self.transaction.get("sender_governorate", "")))
+        sender_layout.addRow("الموقع:", QLabel(self.transaction.get("sender_location", "")))
         
         sender_group.setLayout(sender_layout)
         layout.addWidget(sender_group)
@@ -566,367 +401,119 @@ class TransactionDetailsDialog(QDialog):
         receiver_group = QGroupBox("معلومات المستلم")
         receiver_layout = QFormLayout()
         
-        # Receiver name
-        receiver_name_label = QLabel("الاسم:")
-        receiver_name_value = QLabel(self.transaction.get("receiver_name", ""))
-        receiver_name_value.setStyleSheet("font-weight: bold;")
-        receiver_layout.addRow(receiver_name_label, receiver_name_value)
-        
-        # Receiver mobile
-        receiver_mobile_label = QLabel("رقم الهاتف:")
-        receiver_mobile_value = QLabel(self.transaction.get("receiver_mobile", ""))
-        receiver_layout.addRow(receiver_mobile_label, receiver_mobile_value)
-        
-        # Receiver ID
-        receiver_id_label = QLabel("رقم الهوية:")
-        receiver_id_value = QLabel(self.transaction.get("receiver_id", ""))
-        receiver_layout.addRow(receiver_id_label, receiver_id_value)
-        
-        # Receiver address
-        receiver_address_label = QLabel("العنوان:")
-        receiver_address_value = QLabel(self.transaction.get("receiver_address", ""))
-        receiver_layout.addRow(receiver_address_label, receiver_address_value)
+        receiver_layout.addRow("الاسم:", QLabel(self.transaction.get("receiver", "")))
+        receiver_layout.addRow("رقم الهاتف:", QLabel(self.transaction.get("receiver_mobile", "")))
+        receiver_layout.addRow("المحافظة:", QLabel(self.transaction.get("receiver_governorate", "")))
+        receiver_layout.addRow("الموقع:", QLabel(self.transaction.get("receiver_location", "")))
         
         receiver_group.setLayout(receiver_layout)
         layout.addWidget(receiver_group)
         
         # Additional info group
-        additional_group = QGroupBox("معلومات إضافية")
-        additional_layout = QFormLayout()
+        extra_group = QGroupBox("معلومات إضافية")
+        extra_layout = QFormLayout()
         
-        # Employee
-        employee_label = QLabel("الموظف:")
-        employee_value = QLabel(self.transaction.get("employee_name", ""))
-        additional_layout.addRow(employee_label, employee_value)
+        extra_layout.addRow("الرسالة:", QLabel(self.transaction.get("message", "")))
+        extra_layout.addRow("الموظف:", QLabel(self.transaction.get("employee_name", "")))
         
-        # Branch
-        branch_label = QLabel("الفرع:")
-        branch_value = QLabel(self.transaction.get("branch_name", ""))
-        additional_layout.addRow(branch_label, branch_value)
-        
-        # Notes
-        notes_label = QLabel("ملاحظات:")
-        notes_value = QLabel(self.transaction.get("notes", ""))
-        notes_value.setWordWrap(True)
-        additional_layout.addRow(notes_label, notes_value)
-        
-        additional_group.setLayout(additional_layout)
-        layout.addWidget(additional_group)
+        extra_group.setLayout(extra_layout)
+        layout.addWidget(extra_group)
         
         # Buttons
-        buttons_layout = QHBoxLayout()
+        btn_layout = QHBoxLayout()
         
-        print_button = QPushButton("طباعة")
-        print_button.setStyleSheet("""
-            QPushButton {
-                background-color: #3498db;
-                color: white;
-                border-radius: 5px;
-                padding: 8px 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #2980b9;
-            }
-        """)
-        print_button.clicked.connect(self.print_transaction)
-        buttons_layout.addWidget(print_button)
+        print_btn = QPushButton("طباعة")
+        print_btn.setStyleSheet("background-color: #3498db; color: white;")
+        print_btn.clicked.connect(self.print_transaction)
+        btn_layout.addWidget(print_btn)
         
-        close_button = QPushButton("إغلاق")
-        close_button.setStyleSheet("""
-            QPushButton {
-                background-color: #e74c3c;
-                color: white;
-                border-radius: 5px;
-                padding: 8px 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #c0392b;
-            }
-        """)
-        close_button.clicked.connect(self.accept)
-        buttons_layout.addWidget(close_button)
+        close_btn = QPushButton("إغلاق")
+        close_btn.setStyleSheet("background-color: #e74c3c; color: white;")
+        close_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(close_btn)
         
-        layout.addLayout(buttons_layout)
-        
+        layout.addLayout(btn_layout)
         self.setLayout(layout)
     
-    def get_status_arabic(self, status):
-        """Convert status to Arabic."""
-        status_map = {
-            "pending": "قيد الانتظار",
-            "processing": "قيد المعالجة",
-            "completed": "مكتمل",
-            "cancelled": "ملغي",
-            "rejected": "مرفوض",
-            "on_hold": "معلق"
-        }
-        return status_map.get(status, status)
-    
-    def get_status_text_color(self, status):
-        """Get text color for status."""
-        status_colors = {
-            "pending": "#f39c12",  # Orange
-            "processing": "#3498db",  # Blue
-            "completed": "#2ecc71",  # Green
-            "cancelled": "#e74c3c",  # Red
-            "rejected": "#c0392b",  # Darker red
-            "on_hold": "#f1c40f"  # Yellow
-        }
-        return status_colors.get(status, "#333333")  # Dark gray default
-    
     def print_transaction(self):
-        """Print the transaction."""
-        # This is a placeholder - in a real app, you would implement actual printing
-        QMessageBox.information(self, "طباعة", f"سيتم طباعة التحويل رقم {self.transaction.get('id', '')}")
+        """Print transaction (placeholder)."""
+        QMessageBox.information(self, "طباعة", "سيتم طباعة تفاصيل التحويل")
 
 class TransactionFilterDialog(QDialog):
-    """Dialog for filtering transactions."""
+    """Advanced filter dialog (from new version)."""
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        
-        self.setWindowTitle("تصفية التحويلات")
-        self.setGeometry(300, 300, 400, 400)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #f5f5f5;
-                font-family: Arial;
-            }
-            QLabel {
-                color: #333;
-            }
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #3498db;
-                border-radius: 5px;
-                margin-top: 1em;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-                color: #3498db;
-            }
-            QDateEdit, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
-                border: 1px solid #ccc;
-                border-radius: 5px;
-                padding: 5px;
-                background-color: white;
-            }
-        """)
-        
+        self.setWindowTitle("تصفية متقدمة")
         self.setup_ui()
     
     def setup_ui(self):
-        """Set up the UI components."""
+        """Set up filter UI."""
         layout = QVBoxLayout()
         
-        # Date filter group
-        date_group = QGroupBox("تصفية حسب التاريخ")
+        # Date range
+        date_group = QGroupBox("نطاق التاريخ")
         date_layout = QFormLayout()
         
-        # Start date
-        start_date_label = QLabel("من تاريخ:")
-        self.start_date_edit = QDateEdit()
-        self.start_date_edit.setCalendarPopup(True)
-        self.start_date_edit.setDate(QDate.currentDate().addMonths(-1))  # Default to 1 month ago
-        date_layout.addRow(start_date_label, self.start_date_edit)
+        self.start_date = QDateEdit(QDate.currentDate().addMonths(-1))
+        self.end_date = QDateEdit(QDate.currentDate())
         
-        # End date
-        end_date_label = QLabel("إلى تاريخ:")
-        self.end_date_edit = QDateEdit()
-        self.end_date_edit.setCalendarPopup(True)
-        self.end_date_edit.setDate(QDate.currentDate())  # Default to today
-        date_layout.addRow(end_date_label, self.end_date_edit)
-        
-        # Use date filter checkbox
-        self.use_date_filter = QCheckBox("تطبيق تصفية التاريخ")
-        self.use_date_filter.setChecked(False)
-        date_layout.addRow("", self.use_date_filter)
-        
+        date_layout.addRow("من:", self.start_date)
+        date_layout.addRow("إلى:", self.end_date)
         date_group.setLayout(date_layout)
         layout.addWidget(date_group)
         
-        # Amount filter group
-        amount_group = QGroupBox("تصفية حسب المبلغ")
+        # Amount range
+        amount_group = QGroupBox("نطاق المبلغ")
         amount_layout = QFormLayout()
         
-        # Min amount
-        min_amount_label = QLabel("الحد الأدنى:")
-        self.min_amount_spin = QDoubleSpinBox()
-        self.min_amount_spin.setRange(0, 1000000000)
-        self.min_amount_spin.setDecimals(2)
-        self.min_amount_spin.setSingleStep(100)
-        amount_layout.addRow(min_amount_label, self.min_amount_spin)
+        self.min_amount = QDoubleSpinBox()
+        self.min_amount.setRange(0, 9999999)
+        self.max_amount = QDoubleSpinBox()
+        self.max_amount.setRange(0, 9999999)
+        self.max_amount.setValue(9999999)
         
-        # Max amount
-        max_amount_label = QLabel("الحد الأقصى:")
-        self.max_amount_spin = QDoubleSpinBox()
-        self.max_amount_spin.setRange(0, 1000000000)
-        self.max_amount_spin.setDecimals(2)
-        self.max_amount_spin.setSingleStep(100)
-        self.max_amount_spin.setValue(1000000)  # Default to a high value
-        amount_layout.addRow(max_amount_label, self.max_amount_spin)
-        
-        # Use amount filter checkbox
-        self.use_amount_filter = QCheckBox("تطبيق تصفية المبلغ")
-        self.use_amount_filter.setChecked(False)
-        amount_layout.addRow("", self.use_amount_filter)
-        
+        amount_layout.addRow("الحد الأدنى:", self.min_amount)
+        amount_layout.addRow("الحد الأقصى:", self.max_amount)
         amount_group.setLayout(amount_layout)
         layout.addWidget(amount_group)
         
-        # Status filter group
-        status_group = QGroupBox("تصفية حسب الحالة")
-        status_layout = QFormLayout()
-        
-        # Status combo
-        status_label = QLabel("الحالة:")
-        self.status_combo = QComboBox()
-        self.status_combo.addItem("الكل", "")
-        self.status_combo.addItem("قيد الانتظار", "pending")
-        self.status_combo.addItem("قيد المعالجة", "processing")
-        self.status_combo.addItem("مكتمل", "completed")
-        self.status_combo.addItem("ملغي", "cancelled")
-        self.status_combo.addItem("مرفوض", "rejected")
-        self.status_combo.addItem("معلق", "on_hold")
-        status_layout.addRow(status_label, self.status_combo)
-        
-        # Use status filter checkbox
-        self.use_status_filter = QCheckBox("تطبيق تصفية الحالة")
-        self.use_status_filter.setChecked(False)
-        status_layout.addRow("", self.use_status_filter)
-        
-        status_group.setLayout(status_layout)
-        layout.addWidget(status_group)
-        
-        # Person filter group
-        person_group = QGroupBox("تصفية حسب الأشخاص")
-        person_layout = QFormLayout()
-        
-        # Sender
-        sender_label = QLabel("المرسل:")
-        self.sender_input = QLineEdit()
-        person_layout.addRow(sender_label, self.sender_input)
-        
-        # Receiver
-        receiver_label = QLabel("المستلم:")
-        self.receiver_input = QLineEdit()
-        person_layout.addRow(receiver_label, self.receiver_input)
-        
-        # Use person filter checkbox
-        self.use_person_filter = QCheckBox("تطبيق تصفية الأشخاص")
-        self.use_person_filter.setChecked(False)
-        person_layout.addRow("", self.use_person_filter)
-        
-        person_group.setLayout(person_layout)
-        layout.addWidget(person_group)
-        
         # Buttons
-        buttons_layout = QHBoxLayout()
+        btn_layout = QHBoxLayout()
         
-        reset_button = QPushButton("إعادة تعيين")
-        reset_button.setStyleSheet("""
-            QPushButton {
-                background-color: #e74c3c;
-                color: white;
-                border-radius: 5px;
-                padding: 8px 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #c0392b;
-            }
-        """)
-        reset_button.clicked.connect(self.reset_filters)
-        buttons_layout.addWidget(reset_button)
+        reset_btn = QPushButton("إعادة تعيين")
+        reset_btn.setStyleSheet("background-color: #95a5a6; color: white;")
+        reset_btn.clicked.connect(self.reset_filters)
+        btn_layout.addWidget(reset_btn)
         
-        apply_button = QPushButton("تطبيق")
-        apply_button.setStyleSheet("""
-            QPushButton {
-                background-color: #2ecc71;
-                color: white;
-                border-radius: 5px;
-                padding: 8px 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #27ae60;
-            }
-        """)
-        apply_button.clicked.connect(self.accept)
-        buttons_layout.addWidget(apply_button)
+        apply_btn = QPushButton("تطبيق")
+        apply_btn.setStyleSheet("background-color: #2ecc71; color: white;")
+        apply_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(apply_btn)
         
-        cancel_button = QPushButton("إلغاء")
-        cancel_button.setStyleSheet("""
-            QPushButton {
-                background-color: #95a5a6;
-                color: white;
-                border-radius: 5px;
-                padding: 8px 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #7f8c8d;
-            }
-        """)
-        cancel_button.clicked.connect(self.reject)
-        buttons_layout.addWidget(cancel_button)
+        cancel_btn = QPushButton("إلغاء")
+        cancel_btn.setStyleSheet("background-color: #e74c3c; color: white;")
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
         
-        layout.addLayout(buttons_layout)
-        
+        layout.addLayout(btn_layout)
         self.setLayout(layout)
     
     def reset_filters(self):
         """Reset all filters to default values."""
-        # Reset date filters
-        self.start_date_edit.setDate(QDate.currentDate().addMonths(-1))
-        self.end_date_edit.setDate(QDate.currentDate())
-        self.use_date_filter.setChecked(False)
-        
-        # Reset amount filters
-        self.min_amount_spin.setValue(0)
-        self.max_amount_spin.setValue(1000000)
-        self.use_amount_filter.setChecked(False)
-        
-        # Reset status filter
-        self.status_combo.setCurrentIndex(0)
-        self.use_status_filter.setChecked(False)
-        
-        # Reset person filters
-        self.sender_input.clear()
-        self.receiver_input.clear()
-        self.use_person_filter.setChecked(False)
+        self.start_date.setDate(QDate.currentDate().addMonths(-1))
+        self.end_date.setDate(QDate.currentDate())
+        self.min_amount.setValue(0)
+        self.max_amount.setValue(9999999)
     
     def get_filters(self):
-        """Get the filter values as a dictionary."""
-        filters = {}
-        
-        # Date filters
-        if self.use_date_filter.isChecked():
-            filters["start_date"] = self.start_date_edit.date().toString("yyyy-MM-dd")
-            filters["end_date"] = self.end_date_edit.date().toString("yyyy-MM-dd")
-        
-        # Amount filters
-        if self.use_amount_filter.isChecked():
-            filters["min_amount"] = self.min_amount_spin.value()
-            filters["max_amount"] = self.max_amount_spin.value()
-        
-        # Status filter
-        if self.use_status_filter.isChecked() and self.status_combo.currentData():
-            filters["status"] = self.status_combo.currentData()
-        
-        # Person filters
-        if self.use_person_filter.isChecked():
-            if self.sender_input.text():
-                filters["sender"] = self.sender_input.text()
-            if self.receiver_input.text():
-                filters["receiver"] = self.receiver_input.text()
-        
-        return filters
+        """Return filters as dict."""
+        return {
+            "start_date": self.start_date.date().toString("yyyy-MM-dd"),
+            "end_date": self.end_date.date().toString("yyyy-MM-dd"),
+            "min_amount": self.min_amount.value(),
+            "max_amount": self.max_amount.value()
+        }
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -9,42 +9,78 @@ import datetime
 SECRET_KEY = "929b15e43fd8f1cf4df79d86eb93ca426ab58ae53386c7a91ac4adb45832773b"
 ALGORITHM = "HS256"
 
+# Test users for local login
+TEST_USERS = {
+    "admin": {
+        "password": "password123",
+        "role": "director",
+        "branch_id": 1,
+        "user_id": 1
+    },
+    "branch_manager": {
+        "password": "password123",
+        "role": "branch_manager",
+        "branch_id": 2,
+        "user_id": 2
+    },
+    "employee": {
+        "password": "password123",
+        "role": "employee",
+        "branch_id": 3,
+        "user_id": 3
+    }
+}
+
+def get_common_styles():
+    """Return common stylesheets to reduce duplication."""
+    return """
+        QWidget {
+            background-color: #f5f5f5;
+            font-family: Arial;
+        }
+        QLabel {
+            color: #333;
+            font-size: 14px;
+        }
+        QPushButton {
+            background-color: #2c3e50;
+            color: white;
+            border-radius: 5px;
+            padding: 8px;
+            font-weight: bold;
+        }
+        QPushButton:hover {
+            background-color: #34495e;
+        }
+        QLineEdit, QComboBox {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 8px;
+            background-color: white;
+            font-size: 14px;
+        }
+    """
+
 class LoginWindow(QDialog):
     def __init__(self):
         super().__init__()
-        
         self.setWindowTitle("تسجيل الدخول")
         self.setGeometry(200, 200, 400, 300)
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #f5f5f5;
-                font-family: Arial;
-            }
-            QLabel {
-                color: #333;
-                font-size: 14px;
-            }
-            QPushButton {
-                background-color: #2c3e50;
-                color: white;
-                border-radius: 5px;
-                padding: 8px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #34495e;
-            }
-            QLineEdit {
-                border: 1px solid #ccc;
-                border-radius: 5px;
-                padding: 8px;
-                background-color: white;
-                font-size: 14px;
-            }
-        """)
+        self.setStyleSheet(get_common_styles())
 
+        # Initialize UI components
         self.layout = QVBoxLayout()
+        self.setup_ui()
+        self.setLayout(self.layout)
 
+        # User data
+        self.user_role = None
+        self.branch_id = None
+        self.user_id = None
+        self.token = None
+
+    def setup_ui(self):
+        """Initialize UI components."""
         # Title
         title = QLabel("نظام تحويل الأموال الداخلي")
         title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
@@ -52,292 +88,216 @@ class LoginWindow(QDialog):
         title.setStyleSheet("color: #2c3e50; margin-bottom: 20px;")
         self.layout.addWidget(title)
 
-        self.username_label = QLabel("اسم المستخدم:")
+        # Username and password fields
         self.username_input = QLineEdit(self)
-        self.layout.addWidget(self.username_label)
-        self.layout.addWidget(self.username_input)
-
-        self.password_label = QLabel("كلمة المرور:")
         self.password_input = QLineEdit(self)
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.layout.addWidget(self.password_label)
+        self.layout.addWidget(QLabel("اسم المستخدم:"))
+        self.layout.addWidget(self.username_input)
+        self.layout.addWidget(QLabel("كلمة المرور:"))
         self.layout.addWidget(self.password_input)
 
+        # Login button
         self.login_button = QPushButton("تسجيل الدخول")
         self.login_button.clicked.connect(self.check_login)
         self.login_button.setStyleSheet("""
             QPushButton {
                 background-color: #27ae60;
                 color: white;
-                border-radius: 5px;
                 padding: 10px;
-                font-weight: bold;
                 font-size: 14px;
                 margin-top: 20px;
             }
-            QPushButton:hover {
-                background-color: #2ecc71;
-            }
+            QPushButton:hover { background-color: #2ecc71; }
         """)
         self.layout.addWidget(self.login_button)
 
-        # Add a "Create User" button for admins and branch managers
+        # Create user button (hidden by default)
         self.create_user_button = QPushButton("إنشاء مستخدم جديد")
         self.create_user_button.clicked.connect(self.open_create_user_dialog)
-        self.create_user_button.setVisible(False)  # Hidden by default
+        self.create_user_button.setVisible(False)
         self.layout.addWidget(self.create_user_button)
 
-        self.setLayout(self.layout)
-
-        self.user_role = None
-        self.branch_id = None  # Store branch_id for branch managers
-        self.user_id = None    # Store user_id
-        self.token = None      # Store authentication token
-
     def check_login(self):
-        """Check login credentials and determine user role."""
-        username = self.username_input.text()
-        password = self.password_input.text()
+        """Check credentials via local test or backend API."""
+        username = self.username_input.text().strip()
+        password = self.password_input.text().strip()
 
         if not username or not password:
-            QMessageBox.warning(self, "خطأ", "يرجى إدخال اسم المستخدم وكلمة المرور!")
+            QMessageBox.warning(self, "خطأ", "يرجى إدخال البيانات المطلوبة!")
             return
 
-        # Try local login first, then backend login if local fails
         if self.local_login_test(username, password):
-            return  # Exit if local login is successful
+            return  # Local login successful
 
-        # Backend API authentication
         self.backend_login(username, password)
 
-    def create_local_token(self, username, role, branch_id, user_id=1):
-        """Create a JWT token for local testing that matches the backend token format."""
-        # Set expiration time to 24 hours from now
-        expiration = datetime.datetime.utcnow() + datetime.timedelta(hours=24)
-        
-        # Create token payload
+    def local_login_test(self, username, password):
+        """Authenticate using test users."""
+        user = TEST_USERS.get(username)
+        if user and user["password"] == password:
+            self.user_role = user["role"]
+            self.branch_id = user["branch_id"]
+            self.user_id = user["user_id"]
+            self.token = self.create_local_token(username, user["role"], user["branch_id"], user["user_id"])
+            
+            # Show create button for admins and branch managers
+            self.create_user_button.setVisible(self.user_role in ("director", "branch_manager"))
+            QMessageBox.information(self, "نجاح", f"تم التسجيل كـ {self.user_role}!")
+            self.accept()
+            return True
+        return False
+
+    def create_local_token(self, username, role, branch_id, user_id):
+        """Generate a JWT token for local testing."""
         payload = {
             "username": username,
             "role": role,
             "branch_id": branch_id,
             "user_id": user_id,
-            "exp": expiration
+            "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=24)
         }
-        
-        # Generate token
-        token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-        return token
-
-    def local_login_test(self, username, password):
-        """Check login credentials locally for testing purposes."""
-        if username == "admin" and password == "password123":
-            self.user_role = "director"
-            self.branch_id = 1  # Example branch_id for testing
-            self.user_id = 1    # Example user_id for testing
-            self.token = self.create_local_token(username, "director", 1, 1)
-            self.create_user_button.setVisible(True)  # Show "Create User" button for admin
-            QMessageBox.information(self, "نجاح", "تم تسجيل الدخول بنجاح كمدير!")
-            self.accept()
-            return True
-        elif username == "branch_manager" and password == "password123":
-            self.user_role = "branch_manager"
-            self.branch_id = 2  # Example branch_id for testing
-            self.user_id = 2    # Example user_id for testing
-            self.token = self.create_local_token(username, "branch_manager", 2, 2)
-            self.create_user_button.setVisible(True)  # Show "Create User" button for branch manager
-            QMessageBox.information(self, "نجاح", "تم تسجيل الدخول بنجاح كمدير فرع!")
-            self.accept()
-            return True
-        elif username == "employee" and password == "password123":
-            self.user_role = "employee"
-            self.branch_id = 3  # Example branch_id for testing
-            self.user_id = 3    # Example user_id for testing
-            self.token = self.create_local_token(username, "employee", 3, 3)
-            QMessageBox.information(self, "نجاح", "تم تسجيل الدخول بنجاح كموظف!")
-            self.accept()
-            return True
-        return False  # Local login failed, proceed to backend login
+        return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
     def backend_login(self, username, password):
-        """Authenticate user using the backend API."""
+        """Authenticate via backend API and validate token."""
         try:
             response = requests.post(
                 "http://127.0.0.1:8000/login/",
-                json={"username": username, "password": password}
+                json={"username": username, "password": password},
+                timeout=5
             )
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.user_role = data.get("role")
-                self.branch_id = data.get("branch_id")
-                self.user_id = data.get("user_id")
-                self.token = data.get("token")
-                
-                print(f"Login successful: role={self.user_role}, branch_id={self.branch_id}, user_id={self.user_id}")
+            response.raise_for_status()  # Raise HTTP errors
 
-                # Show "Create User" button for admin and branch manager
-                if self.user_role in ["director", "branch_manager"]:
-                    self.create_user_button.setVisible(True)
+            data = response.json()
+            token = data.get("token")
+            if not token:
+                raise ValueError("No token received")
 
-                QMessageBox.information(self, "نجاح", f"تم تسجيل الدخول بنجاح كـ {self.user_role}!")
-                self.accept()
-            else:
-                QMessageBox.warning(self, "خطأ في تسجيل الدخول", "اسم المستخدم أو كلمة المرور غير صحيحة!")
-        except Exception as e:
-            QMessageBox.warning(self, "خطأ في الاتصال", f"تعذر الاتصال بالخادم: {str(e)}")
+            # Decode token to validate and extract data
+            decoded = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            self.user_role = decoded.get("role")
+            self.branch_id = decoded.get("branch_id")
+            self.user_id = decoded.get("user_id")
+            self.token = token
+
+            # Update UI based on role
+            self.create_user_button.setVisible(self.user_role in ("director", "branch_manager"))
+            QMessageBox.information(self, "نجاح", f"مرحبًا {self.user_role}!")
+            self.accept()
+
+        except requests.exceptions.RequestException as e:
+            QMessageBox.warning(self, "خطأ", f"فشل الاتصال: {str(e)}")
+        except (jwt.InvalidTokenError, ValueError) as e:
+            QMessageBox.warning(self, "خطأ", f"فشل المصادقة: {str(e)}")
 
     def open_create_user_dialog(self):
-        """Open a dialog to create a new user."""
+        """Open user creation dialog."""
         dialog = CreateUserDialog(self.user_role, self.branch_id, self.token, self)
         dialog.exec()
 
 class CreateUserDialog(QDialog):
-    """Dialog to create a new user."""
     def __init__(self, user_role, branch_id, token, parent=None):
         super().__init__(parent)
         self.setWindowTitle("إنشاء مستخدم جديد")
         self.setGeometry(250, 250, 400, 350)
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #f5f5f5;
-                font-family: Arial;
-            }
-            QLabel {
-                color: #333;
-                font-size: 14px;
-            }
-            QPushButton {
-                background-color: #2c3e50;
-                color: white;
-                border-radius: 5px;
-                padding: 8px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #34495e;
-            }
-            QLineEdit, QComboBox {
-                border: 1px solid #ccc;
-                border-radius: 5px;
-                padding: 8px;
-                background-color: white;
-                font-size: 14px;
-            }
-        """)
+        self.setStyleSheet(get_common_styles())
 
         self.user_role = user_role
         self.branch_id = branch_id
         self.token = token
 
+        # Initialize UI
         layout = QVBoxLayout()
-
-        # Title
         title = QLabel("إنشاء مستخدم جديد")
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("color: #2c3e50; margin-bottom: 20px;")
         layout.addWidget(title)
 
-        self.username_label = QLabel("اسم المستخدم:")
-        self.username_input = QLineEdit(self)
-        layout.addWidget(self.username_label)
-        layout.addWidget(self.username_input)
-
-        self.password_label = QLabel("كلمة المرور:")
-        self.password_input = QLineEdit(self)
+        # Username and password fields
+        self.username_input = QLineEdit()
+        self.password_input = QLineEdit()
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        layout.addWidget(self.password_label)
+        layout.addWidget(QLabel("اسم المستخدم:"))
+        layout.addWidget(self.username_input)
+        layout.addWidget(QLabel("كلمة المرور:"))
         layout.addWidget(self.password_input)
 
-        self.role_label = QLabel("الوظيفة:")
-        self.role_input = QComboBox(self)
-        if self.user_role == "director":
-            self.role_input.addItems(["مدير فرع", "موظف"])
-        else:
-            self.role_input.addItems(["موظف"])  # Branch managers can only create employees
-        layout.addWidget(self.role_label)
+        # Role selection
+        self.role_input = QComboBox()
+        layout.addWidget(QLabel("الوظيفة:"))
         layout.addWidget(self.role_input)
-
         if self.user_role == "director":
-            self.branch_label = QLabel("الفرع:")
-            self.branch_input = QComboBox(self)
-            layout.addWidget(self.branch_label)
+            self.role_input.addItem("مدير فرع", "branch_manager")
+            self.role_input.addItem("موظف", "employee")
+        else:
+            self.role_input.addItem("موظف", "employee")
+
+        # Branch selection (for directors)
+        if self.user_role == "director":
+            self.branch_input = QComboBox()
+            layout.addWidget(QLabel("الفرع:"))
             layout.addWidget(self.branch_input)
             self.load_branches()
 
+        # Create button
         self.create_button = QPushButton("إنشاء مستخدم")
         self.create_button.clicked.connect(self.create_user)
         self.create_button.setStyleSheet("""
-            QPushButton {
-                background-color: #27ae60;
-                color: white;
-                border-radius: 5px;
-                padding: 10px;
-                font-weight: bold;
-                font-size: 14px;
-                margin-top: 20px;
-            }
-            QPushButton:hover {
-                background-color: #2ecc71;
-            }
+            QPushButton { background-color: #27ae60; padding: 10px; }
+            QPushButton:hover { background-color: #2ecc71; }
         """)
         layout.addWidget(self.create_button)
 
         self.setLayout(layout)
 
     def load_branches(self):
-        """Load branches from the API."""
+        """Load branches from API."""
         try:
-            headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
-            
-            response = requests.get("http://127.0.0.1:8000/branches/", headers=headers)
-            
-            if response.status_code == 200:
-                branches = response.json()
-                self.branch_input.clear()
-                
-                for branch in branches:
-                    self.branch_input.addItem(branch["name"], branch["id"])
-            else:
-                QMessageBox.warning(self, "خطأ", f"فشل في تحميل الفروع! الخطأ: {response.status_code} - {response.text}")
+            response = requests.get(
+                "http://127.0.0.1:8000/branches/",
+                headers={"Authorization": f"Bearer {self.token}"},
+                timeout=5
+            )
+            response.raise_for_status()
+            branches = response.json()
+            self.branch_input.clear()
+            for branch in branches:
+                self.branch_input.addItem(branch["name"], branch["id"])
         except Exception as e:
-            QMessageBox.warning(self, "خطأ", f"تعذر الاتصال بالخادم: {str(e)}")
+            QMessageBox.warning(self, "خطأ", f"فشل تحميل الفروع: {str(e)}")
 
     def create_user(self):
-        """Create a new user using the backend API."""
-        username = self.username_input.text()
-        password = self.password_input.text()
-        role = "branch_manager" if self.role_input.currentText() == "مدير فرع" else "employee"
+        """Send user creation request to backend."""
+        username = self.username_input.text().strip()
+        password = self.password_input.text().strip()
+        role = self.role_input.currentData()
+        branch_id = (self.branch_input.currentData() 
+                    if self.user_role == "director" 
+                    else self.branch_id)
 
         if not username or not password:
             QMessageBox.warning(self, "خطأ", "يرجى ملء جميع الحقول!")
             return
 
         try:
-            headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
-            
-            # Determine branch_id based on user role
-            selected_branch_id = None
-            if self.user_role == "director":
-                selected_branch_id = self.branch_input.currentData()
-            else:
-                selected_branch_id = self.branch_id
-            
             response = requests.post(
                 "http://127.0.0.1:8000/register/",
                 json={
                     "username": username,
                     "password": password,
                     "role": role,
-                    "branch_id": selected_branch_id
+                    "branch_id": branch_id
                 },
-                headers=headers
+                headers={"Authorization": f"Bearer {self.token}"},
+                timeout=5
             )
-
-            if response.status_code == 200:
-                QMessageBox.information(self, "نجاح", "تم إنشاء المستخدم بنجاح!")
-                self.accept()
-            else:
-                QMessageBox.warning(self, "خطأ", f"فشل في إنشاء المستخدم: الخطأ: {response.status_code} - {response.text}")
+            response.raise_for_status()
+            QMessageBox.information(self, "نجاح", "تم إنشاء المستخدم!")
+            self.accept()
+        except requests.exceptions.HTTPError as e:
+            error_msg = response.json().get("detail", "Unknown error")
+            QMessageBox.warning(self, "خطأ", f"فشل الإنشاء: {error_msg}")
         except Exception as e:
-            QMessageBox.warning(self, "خطأ", f"تعذر الاتصال بالخادم: {str(e)}")
+            QMessageBox.warning(self, "خطأ", f"خطأ في الاتصال: {str(e)}")

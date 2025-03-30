@@ -7,18 +7,16 @@ from ui.branch_manager_dashboard import BranchManagerDashboard
 from ui.user_search import UserSearchDialog
 from login_fixed import LoginWindow
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    
-    # Set application-wide font for Arabic support
-    font = QFont("Arial", 10)
-    app.setFont(font)
-    
-    # Apply stylesheet for modern look
-    app.setStyleSheet("""
+def get_application_styles():
+    """Return centralized stylesheet for the entire application."""
+    return """
+        /* Base styles */
         QWidget {
             font-family: Arial;
+            background-color: #f5f5f5;
         }
+        
+        /* Message Box Styling */
         QMessageBox {
             background-color: #f5f5f5;
         }
@@ -32,21 +30,20 @@ if __name__ == "__main__":
         QMessageBox QPushButton:hover {
             background-color: #34495e;
         }
+
+        /* Modern UI Components */
         QPushButton {
             background-color: #2980b9;
             color: white;
             border-radius: 8px;
             padding: 10px 15px;
-            font-weight: bold;
             font-size: 13px;
             border: none;
         }
-        QPushButton:hover {
-            background-color: #3498db;
-        }
-        QPushButton:pressed {
-            background-color: #1c6ea4;
-        }
+        QPushButton:hover { background-color: #3498db; }
+        QPushButton:pressed { background-color: #1c6ea4; }
+
+        /* Tab Widget Styling */
         QTabWidget::pane {
             border: 1px solid #ccc;
             border-radius: 8px;
@@ -58,12 +55,13 @@ if __name__ == "__main__":
             margin-right: 2px;
             border-top-left-radius: 5px;
             border-top-right-radius: 5px;
-            font-weight: bold;
         }
         QTabBar::tab:selected {
             background-color: #2c3e50;
             color: white;
         }
+
+        /* Table Widget Styling */
         QTableWidget {
             border: none;
             background-color: white;
@@ -74,50 +72,74 @@ if __name__ == "__main__":
             color: white;
             padding: 8px;
             border: 1px solid #1a2530;
-            font-weight: bold;
         }
-        QTableWidget::item {
-            padding: 5px;
-        }
+        QTableWidget::item { padding: 5px; }
         QTableWidget::item:selected {
             background-color: #3498db;
             color: white;
         }
-    """)
+    """
+
+def launch_dashboard(login_data: dict):
+    """Initialize the appropriate dashboard based on user role."""
+    try:
+        if login_data["role"] == "director":
+            window = DirectorDashboard(token=login_data["token"])
+            window.setWindowTitle("لوحة تحكم المدير - نظام التحويلات المالية")
+        elif login_data["role"] == "branch_manager":
+            print(f"Initializing Branch Manager Dashboard (Branch ID: {login_data['branch_id']})")
+            window = BranchManagerDashboard(
+                branch_id=login_data["branch_id"],
+                token=login_data["token"]
+            )
+            window.setWindowTitle(f"لوحة تحكم مدير الفرع - الفرع {login_data['branch_id']}")
+        elif login_data["role"] == "employee":
+            window = MoneyTransferApp(
+                user_token=login_data["token"],
+                branch_id=login_data["branch_id"],
+                user_id=login_data["user_id"],
+                user_role=login_data["role"],
+                username=login_data["username"]
+            )
+            window.setWindowTitle(f"واجهة الموظف - {login_data['username']}")
+        else:
+            raise ValueError("Unknown user role")
+        
+        window.show()
+        return window
+    except Exception as e:
+        QMessageBox.critical(None, "خطأ فادح", f"فشل تحميل الواجهة: {str(e)}")
+        return None
+
+def main():
+    app = QApplication(sys.argv)
+    app.setFont(QFont("Arial", 10))
+    app.setStyleSheet(get_application_styles())
 
     login_window = LoginWindow()
     
-    if login_window.exec() == 1:  # Check if login was successful
-        user_role = login_window.user_role 
-        branch_id = login_window.branch_id
-        user_id = login_window.user_id
-        token = login_window.token
-        username = login_window.username if hasattr(login_window, 'username') else "User"
+    if login_window.exec() != 1:  # Login failed/canceled
+        sys.exit()
 
-        if user_role == "director":
-            # Pass the updated parameters to DirectorDashboard
-            window = DirectorDashboard(token=token)
-            window.setWindowTitle("لوحة تحكم المدير - نظام التحويلات المالية")
-        elif user_role == "branch_manager":
-            # Pass the updated parameters to BranchManagerDashboard
-            print(f"Creating BranchManagerDashboard with branch_id={branch_id}, token={token}")
-            window = BranchManagerDashboard(branch_id, token=token)
-            window.setWindowTitle(f"لوحة تحكم مدير الفرع - نظام التحويلات المالية")
-        elif user_role == "employee":
-            # Use our updated MoneyTransferApp with all the new features
-            window = MoneyTransferApp(
-                user_token=token,
-                branch_id=branch_id,
-                user_id=user_id,
-                user_role=user_role,
-                username=username
-            )
-            window.setWindowTitle(f"واجهة موظف التحويلات - نظام التحويلات المالية")
-        else:
-            QMessageBox.warning(None, "خطأ", "دور المستخدم غير معروف!")
-            sys.exit()
+    # Collect login data with validation
+    login_data = {
+        "role": getattr(login_window, "user_role", None),
+        "branch_id": getattr(login_window, "branch_id", None),
+        "user_id": getattr(login_window, "user_id", None),
+        "token": getattr(login_window, "token", None),
+        "username": login_window.username_input.text().strip()  # Direct access to username field
+    }
 
-        window.show()
-        sys.exit(app.exec())
-    else:
-        sys.exit()  # Exit if login was not successful
+    # Validate critical fields
+    if not all([login_data["role"], login_data["token"]]):
+        QMessageBox.warning(None, "خطأ", "بيانات المستخدم غير مكتملة!")
+        sys.exit()
+
+    window = launch_dashboard(login_data)
+    if not window:
+        sys.exit()
+
+    sys.exit(app.exec())
+
+if __name__ == "__main__":
+    main()

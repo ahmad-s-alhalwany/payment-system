@@ -1,146 +1,241 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QMessageBox
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QPushButton, 
+                            QHBoxLayout, QMessageBox)
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QColor
 
 class ConfirmTransactionDialog(QDialog):
-    """Dialog to confirm transaction before sending."""
-
-    def __init__(self, transaction_data, parent=None):
+    """Modern confirmation dialog for money transfers with enhanced styling."""
+    
+    def __init__(self, parent, sender, sender_mobile, sender_governorate, sender_location,
+                 receiver, receiver_mobile, receiver_governorate, receiver_location, 
+                 amount, currency, message, employee_name, branch_governorate):
         super().__init__(parent)
-        self.setWindowTitle("تأكيد التحويل")
-        self.setGeometry(200, 200, 450, 500)  # Increased height for more fields
         
         # Store transaction data
-        self.transaction_data = transaction_data
+        self.transaction_data = {
+            'sender': sender,
+            'sender_mobile': sender_mobile,
+            'sender_governorate': sender_governorate,
+            'sender_location': sender_location,
+            'receiver': receiver,
+            'receiver_mobile': receiver_mobile,
+            'receiver_governorate': receiver_governorate,
+            'receiver_location': receiver_location,
+            'amount': amount,
+            'currency': currency,
+            'message': message,
+            'employee_name': employee_name,
+            'branch_governorate': branch_governorate
+        }
         
-        # Set up the UI
         self.setup_ui()
-
+    
     def setup_ui(self):
-        """Set up the dialog UI."""
+        """Set up the dialog UI with modern styling."""
+        self.setWindowTitle("تأكيد التحويل")
+        self.setFixedSize(500, 550)  # Fixed size for consistency
+        
+        # Main layout
         layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
         
         # Title
         title = QLabel("تأكيد تفاصيل التحويل")
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("color: #2c3e50; margin-bottom: 20px;")
+        title.setStyleSheet("color: #2c3e50; margin-bottom: 10px;")
         layout.addWidget(title)
         
-        # Format amount with commas - ensure amount is converted to float first
+        # Format amount with commas
         try:
-            amount = float(self.transaction_data.get("amount", 0))
+            amount = float(self.transaction_data.get('amount', 0))
             formatted_amount = f"{amount:,.2f}"
         except (ValueError, TypeError):
             formatted_amount = "0.00"
         
-        # Create info text with all transaction details
-        info_text = f"""
-        <h3>معلومات المرسل:</h3>
-        <p><b>الاسم:</b> {self.transaction_data.get('sender', '')}</p>
-        <p><b>رقم الهاتف:</b> {self.transaction_data.get('sender_mobile', '')}</p>
-        <p><b>المحافظة:</b> {self.transaction_data.get('sender_governorate', '')}</p>
-        <p><b>الموقع:</b> {self.transaction_data.get('sender_location', '')}</p>
+        # Create info sections with modern styling
+        sections = [
+            {
+                'title': "معلومات المرسل",
+                'fields': [
+                    ("الاسم", self.transaction_data.get('sender', '')),
+                    ("رقم الهاتف", self.transaction_data.get('sender_mobile', '')),
+                    ("المحافظة", self.transaction_data.get('sender_governorate', '')),
+                    ("الموقع", self.transaction_data.get('sender_location', ''))
+                ],
+                'color': "#e74c3c"
+            },
+            {
+                'title': "معلومات المستلم",
+                'fields': [
+                    ("الاسم", self.transaction_data.get('receiver', '')),
+                    ("رقم الهاتف", self.transaction_data.get('receiver_mobile', '')),
+                    ("المحافظة", self.transaction_data.get('receiver_governorate', '')),
+                    ("الموقع", self.transaction_data.get('receiver_location', ''))
+                ],
+                'color': "#3498db"
+            },
+            {
+                'title': "تفاصيل التحويل",
+                'fields': [
+                    ("المبلغ", f"{formatted_amount} {self.transaction_data.get('currency', '')}"),
+                    ("الرسالة", self.transaction_data.get('message', 'لا توجد رسالة')),
+                    ("اسم الموظف", self.transaction_data.get('employee_name', '')),
+                    ("محافظة الفرع", self.transaction_data.get('branch_governorate', ''))
+                ],
+                'color': "#2ecc71"
+            }
+        ]
         
-        <h3>معلومات المستلم:</h3>
-        <p><b>الاسم:</b> {self.transaction_data.get('receiver', '')}</p>
-        <p><b>رقم الهاتف:</b> {self.transaction_data.get('receiver_mobile', '')}</p>
-        <p><b>المحافظة:</b> {self.transaction_data.get('receiver_governorate', '')}</p>
-        <p><b>الموقع:</b> {self.transaction_data.get('receiver_location', '')}</p>
+        # Add sections to layout
+        for section in sections:
+            section_group = self.create_section_group(section['title'], section['color'])
+            section_layout = QVBoxLayout()
+            section_layout.setSpacing(8)
+            
+            for field_name, field_value in section['fields']:
+                field_layout = QHBoxLayout()
+                
+                name_label = QLabel(f"<b>{field_name}:</b>")
+                name_label.setStyleSheet("color: #555;")
+                name_label.setFixedWidth(100)
+                
+                value_label = QLabel(field_value)
+                value_label.setStyleSheet("color: #333; font-weight: bold;")
+                value_label.setWordWrap(True)
+                
+                field_layout.addWidget(name_label)
+                field_layout.addWidget(value_label)
+                section_layout.addLayout(field_layout)
+            
+            section_group.setLayout(section_layout)
+            layout.addWidget(section_group)
         
-        <h3>تفاصيل التحويل:</h3>
-        <p><b>المبلغ:</b> {formatted_amount} {self.transaction_data.get('currency', '')}</p>
-        <p><b>الرسالة:</b> {self.transaction_data.get('message', 'لا توجد رسالة')}</p>
-        <p><b>اسم الموظف:</b> {self.transaction_data.get('employee_name', '')}</p>
-        <p><b>محافظة الفرع:</b> {self.transaction_data.get('branch_governorate', '')}</p>
-        <p><b>الفرع المستلم:</b> {self.transaction_data.get('branch_name', '')}</p>
-        """
-        
-        self.info_label = QLabel(info_text)
-        self.info_label.setWordWrap(True)
-        self.info_label.setTextFormat(Qt.TextFormat.RichText)
-        self.info_label.setStyleSheet("""
+        # Warning message
+        warning_label = QLabel(
+            "⚠️ تنبيه: بعد تأكيد التحويل، لا يمكن التراجع عنه. يرجى التأكد من صحة جميع المعلومات."
+        )
+        warning_label.setStyleSheet("""
             QLabel {
-                background-color: white;
-                border: 1px solid #ddd;
+                color: #e74c3c;
+                font-weight: bold;
+                background-color: #ffeeee;
+                border: 1px solid #ffcccc;
                 border-radius: 5px;
-                padding: 15px;
+                padding: 10px;
             }
         """)
-        layout.addWidget(self.info_label)
-        
-        # Warning about transaction finality
-        warning_label = QLabel("تنبيه: بعد تأكيد التحويل، لا يمكن التراجع عنه. يرجى التأكد من صحة جميع المعلومات.")
         warning_label.setWordWrap(True)
-        warning_label.setStyleSheet("color: #e74c3c; font-weight: bold; margin-top: 10px;")
         layout.addWidget(warning_label)
         
-        # Buttons
-        button_layout = QHBoxLayout()
+        # Buttons layout
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(15)
         
-        self.cancel_button = QPushButton("تعديل")
-        self.cancel_button.clicked.connect(self.reject)
-        self.cancel_button.setStyleSheet("""
+        # Edit button
+        self.edit_button = QPushButton("تعديل")
+        self.edit_button.setStyleSheet("""
             QPushButton {
                 background-color: #95a5a6;
                 color: white;
                 border-radius: 5px;
-                padding: 10px;
+                padding: 10px 20px;
                 font-weight: bold;
+                min-width: 100px;
             }
             QPushButton:hover {
                 background-color: #7f8c8d;
             }
         """)
-        button_layout.addWidget(self.cancel_button)
+        self.edit_button.clicked.connect(self.reject)
+        buttons_layout.addWidget(self.edit_button)
         
+        # Confirm button
         self.confirm_button = QPushButton("تأكيد وإرسال")
-        self.confirm_button.clicked.connect(self.confirm_transaction)
         self.confirm_button.setStyleSheet("""
             QPushButton {
                 background-color: #27ae60;
                 color: white;
                 border-radius: 5px;
-                padding: 10px;
+                padding: 10px 20px;
                 font-weight: bold;
+                min-width: 100px;
             }
             QPushButton:hover {
                 background-color: #2ecc71;
             }
         """)
-        button_layout.addWidget(self.confirm_button)
+        self.confirm_button.clicked.connect(self.validate_and_accept)
+        buttons_layout.addWidget(self.confirm_button)
         
-        layout.addLayout(button_layout)
-        
+        layout.addLayout(buttons_layout)
         self.setLayout(layout)
     
-    def confirm_transaction(self):
-        """Confirm the transaction after final validation."""
-        # Perform final validation if needed
+    def create_section_group(self, title, color):
+        """Create a styled section group."""
+        group = QGroupBox(title)
+        group.setStyleSheet(f"""
+            QGroupBox {{
+                font-weight: bold;
+                border: 1px solid {color};
+                border-radius: 5px;
+                margin-top: 1em;
+                padding-top: 15px;
+                background-color: #f9f9f9;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: {color};
+            }}
+        """)
+        return group
+    
+    def validate_and_accept(self):
+        """Validate the transaction before accepting."""
         if not self.validate_transaction():
             return
         
-        # Accept the dialog to proceed with the transaction
         self.accept()
     
     def validate_transaction(self):
-        """Validate the transaction data before final confirmation."""
-        # Check for any missing required fields
-        required_fields = ['sender', 'sender_mobile', 'receiver', 'receiver_mobile', 'amount']
+        """Validate transaction data."""
+        # Check required fields
+        required_fields = [
+            ('sender', 'اسم المرسل'),
+            ('sender_mobile', 'رقم هاتف المرسل'),
+            ('receiver', 'اسم المستلم'),
+            ('receiver_mobile', 'رقم هاتف المستلم'),
+            ('amount', 'المبلغ')
+        ]
         
-        for field in required_fields:
+        for field, name in required_fields:
             if not self.transaction_data.get(field):
-                QMessageBox.warning(self, "بيانات ناقصة", f"الحقل {field} مطلوب لإتمام التحويل.")
+                QMessageBox.warning(
+                    self,
+                    "بيانات ناقصة",
+                    f"الحقل '{name}' مطلوب لإتمام التحويل"
+                )
                 return False
         
-        # Validate amount is positive
+        # Validate amount
         try:
-            amount = float(self.transaction_data.get('amount', 0))
+            amount = float(self.transaction_data['amount'])
             if amount <= 0:
-                QMessageBox.warning(self, "قيمة غير صالحة", "يجب أن يكون المبلغ أكبر من صفر.")
+                QMessageBox.warning(
+                    self,
+                    "قيمة غير صالحة",
+                    "يجب أن يكون المبلغ أكبر من صفر"
+                )
                 return False
-        except (ValueError, TypeError):
-            QMessageBox.warning(self, "قيمة غير صالحة", "المبلغ يجب أن يكون رقماً.")
+        except ValueError:
+            QMessageBox.warning(
+                self,
+                "قيمة غير صالحة",
+                "المبلغ يجب أن يكون رقماً صحيحاً"
+            )
             return False
         
         return True
