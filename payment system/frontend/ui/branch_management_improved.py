@@ -1,14 +1,16 @@
 import sys
 import requests
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox, 
-    QComboBox, QFormLayout, QGroupBox, QHBoxLayout
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QDialog,
+    QLineEdit, QFormLayout, QComboBox, QGroupBox, QGridLayout
 )
-from PyQt6.QtGui import QFont, QDoubleValidator
+from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import Qt
 
 class ModernGroupBox(QGroupBox):
     """Custom styled group box."""
+    
     def __init__(self, title, color="#3498db"):
         super().__init__(title)
         self.setStyleSheet(f"""
@@ -22,13 +24,14 @@ class ModernGroupBox(QGroupBox):
             QGroupBox::title {{
                 subcontrol-origin: margin;
                 left: 10px;
-                padding: 0 5px;
+                padding: 0 5px 0 5px;
                 color: {color};
             }}
         """)
 
 class ModernButton(QPushButton):
-    """Custom styled button with dynamic colors."""
+    """Custom styled button."""
+    
     def __init__(self, text, color="#3498db"):
         super().__init__(text)
         self.setStyleSheet(f"""
@@ -38,94 +41,44 @@ class ModernButton(QPushButton):
                 border-radius: 5px;
                 padding: 8px;
                 font-weight: bold;
-                min-width: 80px;
             }}
             QPushButton:hover {{
-                background-color: {self._adjust_color(color, 20)};
+                background-color: {self.lighten_color(color)};
             }}
             QPushButton:pressed {{
-                background-color: {self._adjust_color(color, -20)};
-            }}
-            QPushButton:disabled {{
-                background-color: #95a5a6;
+                background-color: {self.darken_color(color)};
             }}
         """)
     
-    def _adjust_color(self, hex_color, delta):
-        """Lighten/darken a hex color."""
-        # Fixed list comprehension syntax
-        rgb = [
-            min(255, max(0, int(hex_color[i:i+2], 16) + delta))
-            for i in range(1, 6, 2)  # Positions 1, 3, 5 (R, G, B)
-        ]
-        return f"#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}"
+    def lighten_color(self, color):
+        """Lighten a hex color."""
+        # Simple implementation - not perfect but works for our needs
+        if color.startswith('#'):
+            color = color[1:]
+        r = min(255, int(color[0:2], 16) + 20)
+        g = min(255, int(color[2:4], 16) + 20)
+        b = min(255, int(color[4:6], 16) + 20)
+        return f"#{r:02x}{g:02x}{b:02x}"
+    
+    def darken_color(self, color):
+        """Darken a hex color."""
+        if color.startswith('#'):
+            color = color[1:]
+        r = max(0, int(color[0:2], 16) - 20)
+        g = max(0, int(color[2:4], 16) - 20)
+        b = max(0, int(color[4:6], 16) - 20)
+        return f"#{r:02x}{g:02x}{b:02x}"
 
 class AddBranchDialog(QDialog):
-    def __init__(self, token=None, parent=None):
+    """Dialog for adding a new branch."""
+    
+    def __init__(self, token=None, api_url="http://127.0.0.1:8000", parent=None):
         super().__init__(parent)
         self.token = token
+        self.api_url = api_url
+        
         self.setWindowTitle("إضافة فرع جديد")
-        self.setGeometry(300, 300, 450, 400)
-        
-        # Main layout
-        layout = QVBoxLayout()
-        
-        # Form group
-        form_group = ModernGroupBox("معلومات الفرع")
-        form_layout = QFormLayout()
-        
-        # Branch ID
-        self.branch_id_input = QLineEdit()
-        self.branch_id_input.setPlaceholderText("أدخل رقم الفرع")
-        form_layout.addRow("🆔 رقم الفرع:", self.branch_id_input)
-        
-        # Branch Name
-        self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("أدخل اسم الفرع")
-        form_layout.addRow("🏢 اسم الفرع:", self.name_input)
-        
-        # Location
-        self.location_input = QLineEdit()
-        self.location_input.setPlaceholderText("أدخل الموقع")
-        form_layout.addRow("📍 الموقع:", self.location_input)
-        
-        # Governorate
-        self.governorate_input = QComboBox()
-        self.governorate_input.addItems([
-            "دمشق", "ريف دمشق", "حلب", "حمص", "حماة", "اللاذقية", "طرطوس", 
-            "إدلب", "دير الزور", "الرقة", "الحسكة", "السويداء", "درعا", "القنيطرة"
-        ])
-        form_layout.addRow("محافظة الفرع:", self.governorate_input)
-        
-        # Financial Value (optional)
-        self.financial_input = QLineEdit()
-        self.financial_input.setPlaceholderText("القيمة المالية (اختياري)")
-        self.financial_input.setValidator(QDoubleValidator())  # Only allow numbers
-        form_layout.addRow("💲 القيمة المالية:", self.financial_input)
-        
-        form_group.setLayout(form_layout)
-        layout.addWidget(form_group)
-        
-        # Buttons
-        buttons_layout = QHBoxLayout()
-        
-        self.cancel_button = ModernButton("إلغاء", "#e74c3c")
-        self.cancel_button.clicked.connect(self.reject)
-        buttons_layout.addWidget(self.cancel_button)
-        
-        self.save_button = ModernButton("حفظ", "#27ae60")
-        self.save_button.clicked.connect(self.save_branch)
-        self.save_button.setEnabled(False)  # Disabled by default
-        buttons_layout.addWidget(self.save_button)
-        
-        layout.addLayout(buttons_layout)
-        
-        # Input validation
-        self.branch_id_input.textChanged.connect(self.validate_inputs)
-        self.name_input.textChanged.connect(self.validate_inputs)
-        self.location_input.textChanged.connect(self.validate_inputs)
-        
-        self.setLayout(layout)
+        self.setGeometry(300, 300, 400, 300)
         self.setStyleSheet("""
             QDialog {
                 background-color: #f5f5f5;
@@ -133,92 +86,278 @@ class AddBranchDialog(QDialog):
             }
             QLabel {
                 color: #333;
-                font-size: 14px;
             }
             QLineEdit, QComboBox {
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                padding: 8px;
-                background: white;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                padding: 5px;
+                background-color: white;
             }
         """)
-
-    def validate_inputs(self):
-        """Enable save button only when mandatory fields are filled."""
-        mandatory_filled = all([
-            self.branch_id_input.text().strip(),
-            self.name_input.text().strip(),
-            self.location_input.text().strip()
-        ])
-        self.save_button.setEnabled(mandatory_filled)
-
-    def save_branch(self):
-        """Send branch data to API."""
-        data = {
-            "branch_id": self.branch_id_input.text(),
-            "name": self.name_input.text(),
-            "location": self.location_input.text(),
-            "governorate": self.governorate_input.currentText(),
-            "financial_value": float(self.financial_input.text()) if self.financial_input.text() else None
-        }
-
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
-            response = requests.post(
-                "http://127.0.0.1:8000/branches/",
-                json=data,
-                headers=headers
-            )
-
-            if response.status_code in (200, 201):
-                QMessageBox.information(self, "نجاح", "تمت إضافة الفرع بنجاح!")
-                self.accept()
-            else:
-                error_msg = response.json().get("detail", f"خطأ غير معروف (رمز {response.status_code})")
-                QMessageBox.warning(self, "خطأ", f"فشل الإضافة: {error_msg}")
-                
-        except Exception as e:
-            QMessageBox.critical(self, "خطأ", f"تعذر الاتصال بالخادم: {str(e)}")
-
-class BranchManagement(QDialog):
-    """Main branch management window."""
-    def __init__(self, token=None):
-        super().__init__()
-        self.token = token
-        self.setWindowTitle("إدارة الفروع")
-        self.setGeometry(200, 200, 600, 400)
         
         layout = QVBoxLayout()
         
-        # Title
-        title = QLabel("🏢 إدارة الفروع")
-        title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("color: #2c3e50; margin-bottom: 20px;")
-        layout.addWidget(title)
+        # Form group
+        form_group = ModernGroupBox("معلومات الفرع", "#3498db")
+        form_layout = QFormLayout()
         
-        # Add Branch Button
-        self.add_button = ModernButton("➕ إضافة فرع جديد", "#27ae60")
-        self.add_button.clicked.connect(self.show_add_dialog)
-        layout.addWidget(self.add_button)
+        # Branch ID
+        branch_id_label = QLabel("رمز الفرع:")
+        self.branch_id_input = QLineEdit()
+        self.branch_id_input.setPlaceholderText("أدخل رمز الفرع")
+        form_layout.addRow(branch_id_label, self.branch_id_input)
+        
+        # Branch name
+        branch_name_label = QLabel("اسم الفرع:")
+        self.branch_name_input = QLineEdit()
+        self.branch_name_input.setPlaceholderText("أدخل اسم الفرع")
+        form_layout.addRow(branch_name_label, self.branch_name_input)
+        
+        # Branch location
+        branch_location_label = QLabel("موقع الفرع:")
+        self.branch_location_input = QLineEdit()
+        self.branch_location_input.setPlaceholderText("أدخل موقع الفرع")
+        form_layout.addRow(branch_location_label, self.branch_location_input)
+        
+        # Branch governorate (dropdown)
+        branch_governorate_label = QLabel("محافظة الفرع:")
+        self.branch_governorate_combo = QComboBox()
+        # Add all Syrian governorates
+        self.branch_governorate_combo.addItems([
+            "دمشق", "حلب", "حمص", "حماة", "اللاذقية", "طرطوس", "الرقة", "دير الزور", 
+            "الحسكة", "إدلب", "درعا", "السويداء", "القنيطرة", "ريف دمشق"
+        ])
+        form_layout.addRow(branch_governorate_label, self.branch_governorate_combo)
+        
+        # Branch manager field removed as requested
+        
+        # Branch status
+        branch_status_label = QLabel("حالة الفرع:")
+        self.branch_status_combo = QComboBox()
+        self.branch_status_combo.addItems(["نشط", "غير نشط"])
+        form_layout.addRow(branch_status_label, self.branch_status_combo)
+        
+        form_group.setLayout(form_layout)
+        layout.addWidget(form_group)
+        
+        # Buttons
+        buttons_layout = QHBoxLayout()
+        
+        cancel_button = ModernButton("إلغاء", color="#e74c3c")
+        cancel_button.clicked.connect(self.reject)
+        buttons_layout.addWidget(cancel_button)
+        
+        save_button = ModernButton("حفظ", color="#2ecc71")
+        save_button.clicked.connect(self.save_branch)
+        buttons_layout.addWidget(save_button)
+        
+        layout.addLayout(buttons_layout)
         
         self.setLayout(layout)
+    
+    def save_branch(self):
+        """Save the new branch."""
+        # Validate inputs
+        if not self.branch_id_input.text():
+            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال رمز الفرع")
+            return
+        
+        if not self.branch_name_input.text():
+            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال اسم الفرع")
+            return
+        
+        if not self.branch_location_input.text():
+            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال موقع الفرع")
+            return
+        
+        # Prepare data
+        data = {
+            "branch_id": self.branch_id_input.text(),
+            "name": self.branch_name_input.text(),
+            "location": self.branch_location_input.text(),
+            "governorate": self.branch_governorate_combo.currentText(),
+            "status": "active" if self.branch_status_combo.currentText() == "نشط" else "inactive"
+        }
+        
+        try:
+            headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
+            response = requests.post(f"{self.api_url}/branches/", json=data, headers=headers)
+            
+            if response.status_code == 201 or response.status_code == 200:
+                QMessageBox.information(self, "نجاح", "تم إضافة الفرع بنجاح")
+                self.accept()
+            else:
+                error_msg = f"فشل إضافة الفرع: رمز الحالة {response.status_code}"
+                try:
+                    error_data = response.json()
+                    if "detail" in error_data:
+                        error_msg = error_data["detail"]
+                except:
+                    pass
+                
+                QMessageBox.warning(self, "خطأ", error_msg)
+        except Exception as e:
+            print(f"Error adding branch: {e}")
+            QMessageBox.critical(self, "خطأ في الاتصال", 
+                               "تعذر الاتصال بالخادم. الرجاء التحقق من اتصالك بالإنترنت وحالة الخادم.")
+
+class EditBranchDialog(QDialog):
+    """Dialog for editing a branch."""
+    
+    def __init__(self, branch_data, token=None, api_url="http://127.0.0.1:8000", parent=None):
+        super().__init__(parent)
+        self.branch_data = branch_data
+        self.token = token
+        self.api_url = api_url
+        
+        self.setWindowTitle("تعديل الفرع")
+        self.setGeometry(300, 300, 400, 300)
         self.setStyleSheet("""
-            QWidget {
+            QDialog {
                 background-color: #f5f5f5;
                 font-family: Arial;
             }
+            QLabel {
+                color: #333;
+            }
+            QLineEdit, QComboBox {
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                padding: 5px;
+                background-color: white;
+            }
         """)
+        
+        layout = QVBoxLayout()
+        
+        # Form group
+        form_group = ModernGroupBox("معلومات الفرع", "#3498db")
+        form_layout = QFormLayout()
+        
+        # Branch ID (read-only)
+        branch_id_label = QLabel("رمز الفرع:")
+        self.branch_id_input = QLineEdit()
+        self.branch_id_input.setText(branch_data.get("branch_id", ""))
+        self.branch_id_input.setReadOnly(True)
+        self.branch_id_input.setStyleSheet("background-color: #f0f0f0;")
+        form_layout.addRow(branch_id_label, self.branch_id_input)
+        
+        # Branch name
+        branch_name_label = QLabel("اسم الفرع:")
+        self.branch_name_input = QLineEdit()
+        self.branch_name_input.setText(branch_data.get("name", ""))
+        form_layout.addRow(branch_name_label, self.branch_name_input)
+        
+        # Branch location
+        branch_location_label = QLabel("موقع الفرع:")
+        self.branch_location_input = QLineEdit()
+        self.branch_location_input.setText(branch_data.get("location", ""))
+        form_layout.addRow(branch_location_label, self.branch_location_input)
+        
+        # Branch governorate (dropdown)
+        branch_governorate_label = QLabel("محافظة الفرع:")
+        self.branch_governorate_combo = QComboBox()
+        # Add all Syrian governorates
+        governorates = [
+            "دمشق", "حلب", "حمص", "حماة", "اللاذقية", "طرطوس", "الرقة", "دير الزور", 
+            "الحسكة", "إدلب", "درعا", "السويداء", "القنيطرة", "ريف دمشق"
+        ]
+        self.branch_governorate_combo.addItems(governorates)
+        
+        # Set current governorate if it exists
+        current_governorate = branch_data.get("governorate", "")
+        if current_governorate in governorates:
+            self.branch_governorate_combo.setCurrentText(current_governorate)
+        form_layout.addRow(branch_governorate_label, self.branch_governorate_combo)
+        
+        # Branch status
+        branch_status_label = QLabel("حالة الفرع:")
+        self.branch_status_combo = QComboBox()
+        self.branch_status_combo.addItems(["نشط", "غير نشط"])
+        # Set current status if it exists
+        current_status = branch_data.get("status", "")
+        if current_status == "active":
+            self.branch_status_combo.setCurrentText("نشط")
+        elif current_status == "inactive":
+            self.branch_status_combo.setCurrentText("غير نشط")
+        form_layout.addRow(branch_status_label, self.branch_status_combo)
+        
+        form_group.setLayout(form_layout)
+        layout.addWidget(form_group)
+        
+        # Buttons
+        buttons_layout = QHBoxLayout()
+        
+        cancel_button = ModernButton("إلغاء", color="#e74c3c")
+        cancel_button.clicked.connect(self.reject)
+        buttons_layout.addWidget(cancel_button)
+        
+        save_button = ModernButton("حفظ", color="#2ecc71")
+        save_button.clicked.connect(self.save_branch)
+        buttons_layout.addWidget(save_button)
+        
+        layout.addLayout(buttons_layout)
+        
+        self.setLayout(layout)
+    
+    def save_branch(self):
+        """Save the branch changes."""
+        # Validate inputs
+        if not self.branch_name_input.text():
+            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال اسم الفرع")
+            return
+        
+        if not self.branch_location_input.text():
+            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال موقع الفرع")
+            return
+        
+        # Prepare data
+        data = {
+            "branch_id": self.branch_id_input.text(),
+            "name": self.branch_name_input.text(),
+            "location": self.branch_location_input.text(),
+            "governorate": self.branch_governorate_combo.currentText(),
+            "status": "active" if self.branch_status_combo.currentText() == "نشط" else "inactive"
+        }
+        
+        try:
+            headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
+            response = requests.put(f"{self.api_url}/branches/{self.branch_id_input.text()}", json=data, headers=headers)
+            
+            if response.status_code == 200:
+                QMessageBox.information(self, "نجاح", "تم تحديث الفرع بنجاح")
+                self.accept()
+            else:
+                error_msg = f"فشل تحديث الفرع: رمز الحالة {response.status_code}"
+                try:
+                    error_data = response.json()
+                    if "detail" in error_data:
+                        error_msg = error_data["detail"]
+                except:
+                    pass
+                
+                QMessageBox.warning(self, "خطأ", error_msg)
+        except Exception as e:
+            print(f"Error updating branch: {e}")
+            QMessageBox.critical(self, "خطأ في الاتصال", 
+                               "تعذر الاتصال بالخادم. الرجاء التحقق من اتصالك بالإنترنت وحالة الخادم.")
 
-    def show_add_dialog(self):
-        """Show the add branch dialog."""
-        dialog = AddBranchDialog(self.token, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            # Refresh branch list if needed
-            pass
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = BranchManagement()
-    window.show()
-    sys.exit(app.exec())
+# Add a BranchManagement class for compatibility
+class BranchManagement(QWidget):
+    """Branch management widget."""
+    
+    def __init__(self, token=None, api_url="http://127.0.0.1:8000", parent=None):
+        super().__init__(parent)
+        self.token = token
+        self.api_url = api_url
+        
+        self.setWindowTitle("إدارة الفروع")
+        self.setGeometry(100, 100, 800, 600)
+        
+        # Create a simple layout that shows this is a placeholder
+        layout = QVBoxLayout()
+        label = QLabel("هذا الصف يستخدم فقط للتوافق. استخدم AddBranchDialog و EditBranchDialog بدلاً من ذلك.")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(label)
+        
+        self.setLayout(layout)

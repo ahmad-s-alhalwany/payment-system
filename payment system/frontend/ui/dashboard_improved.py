@@ -48,44 +48,26 @@ class ModernGroupBox(QGroupBox):
             }}
         """)
 
-# Enhance the ModernButton class with more styling options
 class ModernButton(QPushButton):
-    def __init__(self, text, color="#3498db", icon=None):
+    """Custom styled button."""
+    
+    def __init__(self, text, color="#3498db"):
         super().__init__(text)
-        
-        # Set icon if provided
-        if icon:
-            self.setIcon(QIcon(icon))
-            self.setIconSize(QSize(16, 16))
-        
-        # Enhanced styling
         self.setStyleSheet(f"""
             QPushButton {{
                 background-color: {color};
                 color: white;
                 border-radius: 5px;
-                padding: 8px 12px;
+                padding: 8px;
                 font-weight: bold;
-                min-width: 100px;
-                border: none;
-                text-align: center;
             }}
             QPushButton:hover {{
                 background-color: {self.lighten_color(color)};
             }}
             QPushButton:pressed {{
                 background-color: {self.darken_color(color)};
-                padding: 9px 11px 7px 13px;
-            }}
-            QPushButton:disabled {{
-                background-color: #95a5a6;
-                color: #7f8c8d;
             }}
         """)
-        
-        # Add animation on hover
-        self.animation = QPropertyAnimation(self, b"geometry")
-        self.animation.setDuration(100)
     
     def lighten_color(self, color):
         """Lighten a hex color."""
@@ -216,37 +198,7 @@ class DirectorDashboard(QMainWindow):
         self.load_employees()
         self.load_transactions()
         self.load_branches_for_filter()
-        
-        self.setup_quick_actions()
-        self.enhance_tables()
-        self.setup_signals()
-        
-    def setup_signals(self):
-        self.branches_table.itemSelectionChanged.connect(self.update_branch_actions)    
-        
-    def setup_quick_actions(self):
-        """Add a quick actions panel similar to old version's grouped buttons"""
-        quick_actions = ModernGroupBox("إجراءات سريعة", "#9b59b6")
-        layout = QVBoxLayout()
-        
-        # Add buttons from old version that make sense in new context
-        buttons = [
-            ("🔄 تحديث البيانات", self.refresh_all),
-            ("🔐 تغيير كلمة المرور", self.change_password),
-            ("👷‍♂️ إضافة موظف جديد", self.add_employee),
-            ("➕ إضافة فرع جديد", self.add_branch)
-        ]
-        
-        for text, callback in buttons:
-            btn = ModernButton(text, color="#3498db")
-            btn.clicked.connect(callback)
-            layout.addWidget(btn)
-        
-        quick_actions.setLayout(layout)
-        
-        # Add to dashboard tab (or create a new "Quick Actions" tab)
-        self.dashboard_tab.layout().insertWidget(1, quick_actions)
-
+    
     def setup_dashboard_tab(self):
         """Set up the dashboard tab with statistics and charts."""
         layout = QVBoxLayout()
@@ -369,33 +321,6 @@ class DirectorDashboard(QMainWindow):
     
     def setup_branches_tab(self):
         """Set up the branches tab."""
-        
-        self.branches_table.setStyleSheet("""
-            QTableWidget {
-                border: 1px solid #ccc;
-                border-radius: 5px;
-                background-color: white;
-            }
-            QHeaderView::section {
-                background-color: #2c3e50;
-                color: white;
-                padding: 5px;
-                border: 1px solid #1a2530;
-            }
-        """)
-        
-        # Add alternating row colors
-        self.branches_table.setAlternatingRowColors(True)
-        self.branches_table.setStyleSheet("""
-            QTableWidget::item {
-                padding: 5px;
-            }
-            QTableWidget::item:alternate {
-                background-color: #f8f8f8;
-            }
-        """)
-        
-        
         layout = QVBoxLayout()
         
         # Title
@@ -444,70 +369,6 @@ class DirectorDashboard(QMainWindow):
         layout.addLayout(buttons_layout)
         
         self.branches_tab.setLayout(layout)
-    
-    # Use the old version's more robust error handling
-    def fetch_branches(self):
-        """Improved version combining both approaches"""
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
-            response = requests.get(f"{self.api_url}/branches/", headers=headers)
-            
-            if response.status_code == 200:
-                branches = response.json()
-                self.display_branches(branches)
-            else:
-                # Use old version's detailed error message
-                error_msg = f"فشل في تحميل الفروع! الخطأ: {response.status_code}"
-                try:
-                    error_msg += f" - {response.json().get('detail', '')}"
-                except:
-                    pass
-                QMessageBox.warning(self, "خطأ", error_msg)
-                
-        except Exception as e:
-            QMessageBox.warning(self, "خطأ", f"تعذر الاتصال بالخادم: {str(e)}")
-
-    def display_branches(self, branches):
-        """Combine both versions' display logic"""
-        self.branches_table.setRowCount(len(branches))
-        self.branches_table.setColumnCount(5)
-        self.branches_table.setHorizontalHeaderLabels([
-            "ID", "اسم الفرع", "الموقع", "المحافظة", "عدد الموظفين"
-        ])
-        
-        for row_idx, branch in enumerate(branches):
-            self.branches_table.setItem(row_idx, 0, QTableWidgetItem(str(branch.get("id", ""))))
-            self.branches_table.setItem(row_idx, 1, QTableWidgetItem(branch.get("name", "")))
-            self.branches_table.setItem(row_idx, 2, QTableWidgetItem(branch.get("location", "")))
-            self.branches_table.setItem(row_idx, 3, QTableWidgetItem(branch.get("governorate", "")))
-            
-            # Get employee count (from new version)
-            emp_count = 0
-            try:
-                headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
-                emp_response = requests.get(
-                    f"{self.api_url}/branches/{branch['id']}/employees/stats/", 
-                    headers=headers
-                )
-                if emp_response.status_code == 200:
-                    emp_count = emp_response.json().get("total", 0)
-            except:
-                pass
-            
-            self.branches_table.setItem(row_idx, 4, QTableWidgetItem(str(emp_count)))
-    
-    def refresh_all(self):
-        """Refresh all data like in old version"""
-        self.load_dashboard_data()
-        self.load_branches()
-        self.load_employees()
-        self.load_transactions()
-        
-        # Show confirmation message
-        QMessageBox.information(self, "تحديث", "🔄 تم تحديث البيانات!")
-        
-        # Update status bar
-        self.status_bar.showMessage("تم تحديث البيانات في " + datetime.datetime.now().strftime("%H:%M:%S"))
     
     def setup_employees_tab(self):
         """Set up the employees tab."""
